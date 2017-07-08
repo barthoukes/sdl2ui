@@ -11,23 +11,41 @@
  **              Cbutton
  */
 /*------------------------------------------------------------------------------
- **  Copyright (c) Bart Houkes, 10 aug 2011
+ ** Copyright (C) 2011, 2014, 2015
+ ** Houkes Horeca Applications
  **
- **  Copyright notice:
- **  This software is property of Bart Houkes.
- **  Unauthorized duplication and disclosure to third parties is forbidden.
- **============================================================================*/
+ ** This file is part of the SDL2UI Library.  This library is free
+ ** software; you can redistribute it and/or modify it under the
+ ** terms of the GNU General Public License as published by the
+ ** Free Software Foundation; either version 3, or (at your option)
+ ** any later version.
+
+ ** This library is distributed in the hope that it will be useful,
+ ** but WITHOUT ANY WARRANTY; without even the implied warranty of
+ ** MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
+ ** GNU General Public License for more details.
+
+ ** Under Section 7 of GPL version 3, you are granted additional
+ ** permissions described in the GCC Runtime Library Exception, version
+ ** 3.1, as published by the Free Software Foundation.
+
+ ** You should have received a copy of the GNU General Public License and
+ ** a copy of the GCC Runtime Library Exception along with this program;
+ ** see the files COPYING3 and COPYING.RUNTIME respectively.  If not, see
+ ** <http://www.gnu.org/licenses/>
+ **===========================================================================*/
 
 #pragma once
 
 /*------------- Standard includes --------------------------------------------*/
 #include <string>
-#include "keybutton.h"
+#include "sdl_keybutton.h"
 #include "sdl_graphics.h"
 #include "sdl_dialog_object.h"
 #include "sdl_rectangle.h"
 #include "sdl_text.h"
 #include "sdl_label.h"
+#include "sdl_image.h"
 
 /// @brief  Forward declaration.
 class Cdialog;
@@ -71,19 +89,20 @@ public:
 	virtual ~Cbutton();
 
 public:
-	void	onPaint( int touch);
-	void	onPaint( const std::string &text, int touch);
+	virtual void onPaint( int touch);
+	virtual void onPaint( const std::string &text, int touch);
 	void	setText( const std::string &text);
 	void 	setText( textId id);
 	std::string getText();
 	void 	setInfoText( const std::string &text);
 	void 	setImage( const std::string &image, Egravity horizontal=GRAVITY_NO_CHANGE);
+	void    setTop( int y) { m_rect.setTop(y); }
 	void	setColours( colour text, colour background1 =COLOUR_BLACK, colour background2=COLOUR_DARKGRAY);
 	void 	setBorderColours( colour b1, colour b2=-1);
 	void	setBackgroundColour( colour background, colour background2=COLOUR_DARKGRAY);
 	void	setBorder( EborderType border, int radius =0);
 	void    setSpacing( int spacing) { m_spacing =spacing; }
-	void    setImageGravity( Egravity gravity) { m_imageAlign =gravity; }
+	void    setImageGravity( Egravity gravity) { m_image.setGravity( gravity); }
 	void    setTextGravity( Egravity text) { if (m_textButton) m_textButton->setGravity( text); }
 	void	setFillType( EfillType fill =FILL_UNICOLOURED);
     void    setFont( const Sfont &font) { if ( m_textButton) m_textButton->setFont( font); }
@@ -100,7 +119,6 @@ public:
 		m_label.setText( label);
 	}
 	virtual void onPaint( const Cpoint &p, int touch);
-	void 	addDefaultIcon();
 	void    alignBottom( bool bottom)
 	{
 		m_alignBottom =bottom;
@@ -134,22 +152,22 @@ public:
 	{
 		if ( m_textButton) { m_textButton->setCursor( cursor); }
 	}
+	void setStyle( EimageStyle style, colour col) { m_image.setStyle(style,col); }
+	void setCorner( int corner )
+	{ m_background.setCorner( corner ); m_background.setFillStyle( FILL_PIE ); }
 
 private:
 	void 	paintBackground( int touch);
 	void	paintBorder( EborderType border, int spacing, int radius, int touch);
-	void	paintImage( int touch);
 	void 	paintText( const std::string &text, int touch);
 	void	paintLabel();
 	void	paintCross();
-
+	void    paintImage();
 
 protected:
 	Cbackground			m_background;	///< Square inside.
+	Cimage				m_image;		///< Image.
 	Clabel		 		m_label;	///< Label for the button.
-	std::string			m_icon;		///< Image for the button.
-	Egravity			m_imageAlign; ///< Align of image.
-	std::string			m_image;	///< Image name.
 	std::string			m_text;		///< Text to show.
 	colour		 		m_textColour; ///< Colour text. Almost obsolete.
 	bool				m_noBackground; ///< No background.
@@ -159,7 +177,6 @@ protected:
 	bool				m_useText;	///< Use text or id.
 	colour			 	m_border1;	///< Border colour 1.
 	colour			 	m_border2;	///< Border colour 2.
-	bool				m_imageEnable; ///< Image enabled.
 	bool				m_alignBottom;	///< Bottom alignment.
 	Ctext				*m_textButton; ///< Text button to use.
 	int					m_style;		///< Style for the button.
@@ -168,6 +185,8 @@ protected:
 	int                 m_spacing; ///< space between buttons.
 	colour				m_shadow; ///< text shadow colour.
 	colour				m_button_shadow; ///< shadow button.
+	int					m_imageSize; ///< Size of image.
+	Egravity			m_imageGravity; ///< Gravity image.
 };
 
 
@@ -179,7 +198,10 @@ public:
 					 keybutton key,
 				     textId id,
 				     const std::string &icon="");
-public:
+	CmenuButton( const Crect &rect,
+					 keybutton key,
+				     const std::string &text,
+				     const std::string &icon="");public:
 	~CmenuButton() {}
 };
 
@@ -249,6 +271,7 @@ public:
 	   	   	       keybutton key =KEY_NONE);
 public:
 	virtual ~CheaderButton() {}
+	virtual void onPaint(int touch) { Cbutton::onPaint(touch); }
 };
 
 /// @brief Button for matrix.
@@ -286,6 +309,10 @@ public:
 	CcalculatorButton( const Crect &rect,
 			       const std::string &s,
 	   	   	       keybutton key);
+	CcalculatorButton( const Crect &rect,
+			       const std::string &s,
+	   	   	       keybutton key,
+				   const std::string &img);
 	CcalculatorButton( Simage *image, int x, int y);
 public:
 	virtual ~CcalculatorButton() {}
@@ -327,4 +354,14 @@ public:
 public:
 	virtual ~CgraphButton() {}
 
+};
+
+/// @brief Button at bottom of screen.
+class CiconButton: public Cbutton
+{
+public:
+	CiconButton(Cdialog *parent, const Crect &rect, keybutton key,
+			const std::string &icon, colour background);
+public:
+	virtual ~CiconButton() {}
 };

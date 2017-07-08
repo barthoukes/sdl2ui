@@ -1,6 +1,6 @@
 /*============================================================================*/
 /**  @file       sdl_dialog.cpp
- **  @ingroup    zhongcan_sdl
+ **  @ingroup    sdl2ui
  **  @brief		 Default dialog.
  **
  **  Create a default dialog. This is a basic template for all dialogs, including message boxes.
@@ -11,74 +11,104 @@
  **              CDialog
  */
 /*------------------------------------------------------------------------------
- **  Copyright (c) Bart Houkes, 28 jan 2011
- ** 
- **  Copyright notice:
- **  This software is property of Bart Houkes.
- **  Unauthorized duplication and disclosure to third parties is forbidden.
- **============================================================================*/
+ ** Copyright (C) 2011, 2014, 2015
+ ** Houkes Horeca Applications
+ **
+ ** This file is part of the SDL2UI Library.  This library is free
+ ** software; you can redistribute it and/or modify it under the
+ ** terms of the GNU General Public License as published by the
+ ** Free Software Foundation; either version 3, or (at your option)
+ ** any later version.
+
+ ** This library is distributed in the hope that it will be useful,
+ ** but WITHOUT ANY WARRANTY; without even the implied warranty of
+ ** MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
+ ** GNU General Public License for more details.
+
+ ** Under Section 7 of GPL version 3, you are granted additional
+ ** permissions described in the GCC Runtime Library Exception, version
+ ** 3.1, as published by the Free Software Foundation.
+
+ ** You should have received a copy of the GNU General Public License and
+ ** a copy of the GCC Runtime Library Exception along with this program;
+ ** see the files COPYING3 and COPYING.RUNTIME respectively.  If not, see
+ ** <http://www.gnu.org/licenses/>
+ **===========================================================================*/
 
 /*------------- Standard includes --------------------------------------------*/
-
 #include <assert.h>
+#include <stdio.h>
 #include "sdl_dialog.h"
 #include "sdl_swype_dialog.h"
-#include "graphics_widgets.h"
 #include "timeout.h"
 #include "sdl_dialog_event.h"
 #include "sdl_dialog_list.h"
+#include "sdl_label.h"
 
-int Cdialog::m_init = 0;
-bool Cdialog::m_invalidate =true;
+
 pthread_mutex_t Cdialog::m_objectMutex;
 bool Cdialog::m_objectLocked =false;
 pthread_mutexattr_t Cdialog::m_attr;
-int Cdialog::m_main_thread =0;
 bool Cdialog::m_useClick =true;
-CkeyFile Cdialog::m_keyFile;
-CdialogObject *Cdialog::m_dragObject =NULL;		///< Object to drag.
-Cpoint Cdialog::m_dragOffset( 0,0);
-Cpoint Cdialog::m_dragStart( 0,0);
-Cpoint Cdialog::m_dragPoint( 0,0);
+Iworld *Cdialog::g_defaultWorld = NULL;
+
+
+#define START_FUNC
+#define END_FUNC
 
 /*============================================================================*/
 ///
-/// @brief Constructor.
+/// @brief Constructor for dialog in the world.
 ///
 /*============================================================================*/
-Cdialog::Cdialog( Cdialog *parent, const std::string &name, const Crect &rect)
-: m_alive(true)
+Cdialog::Cdialog( Cdialog *parent, const std::string &name, const Crect &rect, Iworld *world)
+: m_world(parent ? parent->m_world:NULL)
+, m_alive(true)
 , m_allButtons(false)
 , m_backgroundColour( Cgraphics::m_defaults.background)
+, m_current_thread(0)
 , m_exitValue(0)
+, m_in_main_thread(false)
 , m_parent(parent)
 , m_spaceIsLanguage(true)
 , m_visible(true)
+, m_invalidate(true)
 , m_isMessageBox(false)
 , m_running(false)
 , m_root(this)
 , m_rect( rect)
+, m_squares_width( Cgraphics::m_defaults.width/8)
+, m_squares_height( Cgraphics::m_defaults.height/8)
+, m_dialogOffset(0,0)
+#ifdef USE_SDL2
+, m_graphics(NULL)
+, m_myGraphics(NULL)
+, m_render_after_paint(true)
+, m_full_screen(rect.width() == m_squares_width && rect.height() == m_squares_height)
+#else
 , m_graphics( (parent==NULL || parent->m_graphics==NULL) ? m_mainGraph:parent->m_graphics)
+#endif
+, m_selfDestruct(false)
 {
+	if ( !m_world)
+	{
+		m_world = world ? world:g_defaultWorld;
+	}
+	if (g_defaultWorld == NULL)
+	{
+		g_defaultWorld = m_world;
+	}
 	if (rect.width()==0 && rect.height()==0)
 	{
-		m_rect =Crect(0,0, Cgraphics::m_defaults.width, Cgraphics::m_defaults.height);
+		m_rect =Crect(0,0, Cgraphics::m_defaults.width/8, Cgraphics::m_defaults.height/8);
+		m_full_screen =true;
 	}
-	if (!m_init)
-	{
-		pthread_mutexattr_settype(&m_attr, PTHREAD_MUTEX_RECURSIVE);
-		pthread_mutex_init( &m_objectMutex, &m_attr);
-		m_main_thread =pthread_self();
-		//m_language =static_cast<Taal>( CFG("default_language"));
-		m_keyFile.init();
-	}
-	g_myWorld.lock();
-	m_init++;
+
+	m_world->lock();
 	m_name =name;
 	m_current_thread =pthread_self();
-	m_in_main_thread =(m_main_thread ==m_current_thread);
 	// Dialog initialised
-	g_myWorld.unlock();
+	m_world->unlock();
 }
 
 /*============================================================================*/
@@ -88,24 +118,9 @@ Cdialog::Cdialog( Cdialog *parent, const std::string &name, const Crect &rect)
 /*============================================================================*/
 Cdialog::~Cdialog()
 {
-	// Cdialog::~Cdialog
-	if (m_init == 0)
-	{
-		g_myWorld.lock(); // Children+Messageboxes should not change.
-		CdialogEvent::Instance()->stop();
-		CdialogBase *a;
-		for ( a=g_messageBox.firstDialog(); a!=NULL; a=g_messageBox.nextDialog( a))
-		{
-			Cdialog *t=dynamic_cast<Cdialog*>(a);
-			if (t) delete t;
-		}
-		g_messageBox.clear();
-		g_myWorld.unlock(); // Children+Messageboxes should not change end.
+#ifdef USE_SDL2
+#endif
 
-		delete m_graphics;
-		m_graphics =NULL;
-		CdialogEvent::Instance()->KillInstance();
-	}
 }
 
 /** @brief Register a new child to handle for a dialog.
@@ -113,7 +128,7 @@ Cdialog::~Cdialog()
  */
 void Cdialog::registerChild(Cdialog *child)
 {
-	assert( (int)pthread_self()==m_main_thread);
+	m_world->checkInMainThread();
 	m_children.addDialog( child);
 }
 
@@ -150,7 +165,7 @@ void Cdialog::unregisterObject(CdialogObject *child)
  */
 void Cdialog::setBackgroundColour( colour colour)
 {
-	assert( (int)pthread_self()==m_main_thread);
+	m_world->checkInMainThread();
 	m_backgroundColour =colour;
 	invalidate();
 }
@@ -187,11 +202,27 @@ void Cdialog::registerObject(CdialogObject *child)
 /// @post       Class removed. Please also remove all references.
 ///
 /*============================================================================*/
-void Cdialog::invalidate()
+void Cdialog::invalidate( bool needs_repaint)
 {
-	g_myWorld.lock();
-	m_invalidate =true;
-	g_myWorld.unlock();
+	m_world->lock();
+	m_invalidate =needs_repaint;
+	m_world->unlock();
+}
+
+/*============================================================================*/
+///
+/// @brief 		Invalidate GUI. This will be re-painted.
+///
+/// @post       Class removed. Please also remove all references.
+///
+/*============================================================================*/
+bool Cdialog::isInvalidated()
+{
+	bool retVal;
+	m_world->lock();
+	retVal =m_invalidate;
+	m_world->unlock();
+	return retVal;
 }
 
 /*============================================================================*/
@@ -203,9 +234,10 @@ void Cdialog::invalidate()
 /*============================================================================*/
 void Cdialog::invalidateAll()
 {
-	assert( (int)pthread_self()==m_main_thread);
-	g_myWorld.lock();
+	m_world->checkInMainThread();
+	m_world->invalidateAll();
 	CdialogBase *a;
+	m_world->lock();
 	for ( a =m_children.firstDialog(); a !=NULL; a =m_children.nextDialog( a))
 	{
 		CswypeDialog *dialog =dynamic_cast<CswypeDialog*>( a);
@@ -215,7 +247,7 @@ void Cdialog::invalidateAll()
 		}
 	}
 	m_invalidate =true;
-	g_myWorld.unlock();
+	m_world->unlock();
 }
 
 /*============================================================================*/
@@ -227,7 +259,7 @@ void Cdialog::invalidateAll()
 /*============================================================================*/
 bool Cdialog::onInit()
 {
-	assert( (int)pthread_self()==m_main_thread);
+	m_world->checkInMainThread();
 	invalidate();
 	//Log.write( "Cdialog::onInit");
 	return true;
@@ -250,7 +282,7 @@ bool Cdialog::onLoop()
  */
 void Cdialog::stop(int exitValue)
 {
-	assert( (int)pthread_self()==m_main_thread);
+	m_world->checkInMainThread();
 	// Stop dialog m_name exitValue
  	m_exitValue=exitValue;
 	m_running =false;
@@ -268,17 +300,30 @@ void Cdialog::stop(int exitValue)
 /*============================================================================*/
 int Cdialog::onExecute( Cdialog *parent)
 {
-	assert( (int)pthread_self()==m_main_thread);
+	bool started=false;
+	(void)parent;
+	m_world->checkInMainThread();
 	CdialogBase* a;
 
 	m_exitValue =0;
 	m_running =true;
-	g_myWorld.addDialog( this);
-	g_myWorld.lock();
-
+	if (m_full_screen)
+	{
+		m_world->setActiveDialog(this);
+	}
+#ifdef USE_SDL2
+	if (!m_graphics && !m_full_screen)
+	{
+		m_graphics = std::make_shared<Cgraphics>(m_rect.size(), false);
+		m_graphics->init();
+	}
+	if (!m_graphics)
+	{
+		m_graphics = m_world->graphics();
+	}
+#endif
 	CeventInterface *stack =CdialogEvent::Instance()->getInterface();
 	CdialogEvent::Instance()->registerActiveDialog( dynamic_cast<CeventInterface*>(this));
-
 	if (onInit() == false)
 	{
 		m_running =false;
@@ -291,7 +336,6 @@ int Cdialog::onExecute( Cdialog *parent)
 			m_running =false;
 		}
 	}
-	g_myWorld.unlock();
 
 	if ( m_running )
 	{
@@ -302,76 +346,19 @@ int Cdialog::onExecute( Cdialog *parent)
 
 	while (m_running)
 	{
+		started=true;
 #ifndef ZHONGCAN_MULTI_THREAD
 		CdialogEvent::Instance()->work();
 #endif
+		m_world->paintAll();
+		bool no_action = m_world->onLoop();
 
-		bool no_action =true;
-		paintAll();
-		for ( a=m_children.firstDialog(); a!=NULL; a=m_children.nextDialog(a))
-		{
-			Cdialog *t=dynamic_cast<Cdialog*>(a);
-			if (t==NULL)
-			{
-				continue;
-			}
-			if ( t->onLoop()==false)
-			{
-				m_running =false;
-				break;
-			}
-		}
 		if ( m_running ==false)
 		{
+			m_world->unlock();
 			break;
 		}
-		EpollStatus status;
-		while ( m_running ==true && (status=CdialogEvent::Instance()->pollEvent( this) )!=POLL_EMPTY)
-		{
-			no_action =false;
-			if ( m_running ==false)
-			{
-				break;
-			}
-			int cnt3=0;
-			for ( a=g_messageBox.firstDialog(); a !=NULL; a=g_messageBox.nextDialog( a))
-			{
-				Cdialog *t=dynamic_cast<Cdialog*>(a);
-				if (!t)
-				{
-					continue;
-				}
-				if (t->onLoop()==false)
-				{
-					// Close the dialog, not the layers below.
-					if ( t->m_alive ==false)
-					{
-						//Cdialog::onExecute  delete the message box  t->m_name
-						invalidate();
-						t->unregisterMessageBox();
-						delete t;
-						break;
-					}
-				}
-				cnt3++;
-			}
-
-			if ( status==POLL_TESTING)
-			{
-				break;
-			}
-		}
-		g_myWorld.lock();
-		if ( onLoop() ==false)
-		{
-			m_running =false;
-		}
-		if ( m_running ==false)
-		{
-			g_myWorld.unlock();
-			break;
-		}
-		g_myWorld.unlock();
+		m_world->unlock();
 		if ( m_touchList.update( CdialogEvent::Instance()->pressMouse(), CdialogEvent::Instance()->lastMouse()))
 		{
 			invalidate();
@@ -381,16 +368,23 @@ int Cdialog::onExecute( Cdialog *parent)
 			delay(10);
 		}
 	}
+	if (started)
+	{
+		m_world->paintAll();
+		m_touchList.update( CdialogEvent::Instance()->pressMouse(), CdialogEvent::Instance()->lastMouse());
+		delay(5);
+	}
 	stopExecute();
-	onCleanup();
+	m_world->onCleanup();
 
 	for ( a =m_children.firstDialog(); a !=NULL; a =m_children.nextDialog(a))
 	{
 		Cdialog *t=dynamic_cast<Cdialog*>(a);
 		if (t) t->onCleanup();
 	}
-	m_dragObject =NULL;
-	g_myWorld.removeDialog( this);
+	onCleanup();
+	m_dragObject.clean();
+	m_world->setActiveDialog(NULL);
 	CdialogEvent::Instance()->registerActiveDialog( stack);
 
 	// end Cdialog::onExecute: m_name m_exitValue
@@ -413,56 +407,6 @@ void Cdialog::setRect( const Crect &rect)
 	}
 }
 
-/** @brief Paint all from this dialog. */
-void Cdialog::paintAll()
-{
-	CdialogBase *a;
-
-	if ( !m_invalidate)
-	{
-		return;
-	}
-	g_myWorld.lock();
-	CdialogEvent::Instance()->lock();
-	onClearScreen();
-	if ( m_visible)
-	{
-		onPaint();
-		onPaintButtons();
-	}
-	for ( a=m_children.firstDialog(); a!=NULL; a=m_children.nextDialog(a))
-	{
-		CswypeDialog *dialog =dynamic_cast<CswypeDialog*>(a);
-		if ( dialog !=NULL)
-		{
-			dialog->invalidate(-1);
-		}
-		Cdialog *t=dynamic_cast<Cdialog*>(a);
-		if ( t && t->m_visible)
-		{
-			t->onPaint();
-			t->onPaintButtons();
-		}
-	}
-
-	int cnt=0;
-	for ( a=g_messageBox.firstDialog(); a !=NULL; a=g_messageBox.nextDialog( a))
-	{
-		Cdialog *t=dynamic_cast<Cdialog*>(a);
-		if (t->m_visible)
-		{
-			t->onClearScreen();
-			t->onPaint();
-			t->onPaintButtons();
-		}
-		cnt++;
-	}
-	onDisplay();
-	m_invalidate = false;
-	CdialogEvent::Instance()->unlock();
-	g_myWorld.unlock();
-}
-
 /*============================================================================*/
 ///
 /// @brief Paint all grey.
@@ -472,17 +416,31 @@ void Cdialog::paintAll()
 /*============================================================================*/
 void Cdialog::onClearScreen()
 {
-	::ColorAT( m_rect.left(), m_rect.top(),
-			m_rect.width(), m_rect.height(),
-			 m_backgroundColour);
-	if ( m_rect.width()==Cgraphics::m_defaults.width/8 &&
-		 m_rect.height()==Cgraphics::m_defaults.height)
+    bool fullscreen = ( m_rect.width()==Cgraphics::m_defaults.width/8 &&
+			 m_rect.height()==Cgraphics::m_defaults.height/8);
+
+    m_graphics->setColour( m_backgroundColour );
+#ifdef USE_SDL2
+	if (fullscreen)
+	{
+		m_world->graphics()->cleardevice();
+ 		m_world->graphics()->image( Cgraphics::m_defaults.full_screen_image_background,
+				           m_rect.left()*8, m_rect.top()*8,
+			               m_rect.width()*8, m_rect.height()*8);
+	}
+	else
+	{
+		m_world->graphics()->bar( m_rect.left()*8, m_rect.top()*8, m_rect.right()*8, m_rect.bottom()*8,0);
+	}
+#else
+	m_world->graphics()->bar( m_rect.left()*8, m_rect.top()*8, m_rect.right()*8, m_rect.bottom()*8,0);
+	if ( fullscreen )
 	{
 		m_graphics->image( Cgraphics::m_defaults.full_screen_image_background,
-				           m_rect.left(), m_rect.top(),
-				m_rect.width(), m_rect.height());
+				           m_rect.left()*8, m_rect.top()*8,
+				m_rect.width()*8, m_rect.height()*8);
 	}
-	m_graphics->setCode( m_rect, KEY_NONE);
+#endif
 }
 
 /*============================================================================*/
@@ -534,7 +492,7 @@ void Cdialog::objectUnlock()
  */
 void Cdialog::setVisible( bool visible)
 {
-	assert( (int)pthread_self()==m_main_thread);
+	m_world->checkInMainThread();
 	m_visible=visible; invalidate();
 }
 
@@ -549,10 +507,16 @@ void Cdialog::setVisible( bool visible)
 /// @return		DIALOG_EVENT_PROCESSED when event is handled.
 ///
 /*============================================================================*/
-Estatus Cdialog::onEvent( Cevent &event)
+Estatus Cdialog::onEvent( const Cevent &event)
 {
-	assert( (int)pthread_self()==m_main_thread);
+	m_world->checkInMainThread();
 	std::vector<Cdialog*>::iterator a;
+
+	if ( m_touchList.update( CdialogEvent::Instance()->pressMouse(), CdialogEvent::Instance()->lastMouse()))
+	{
+		invalidate();
+		m_world->paintAll();
+	}
 
 	Estatus stat =DIALOG_EVENT_GENERAL;
 	if (!m_running)
@@ -574,6 +538,9 @@ Estatus Cdialog::onEvent( Cevent &event)
 		break;
 	case EVENT_TOUCH_MOVE:
 		break;
+	case EVENT_TOUCH_LONG:
+		touchLong( event.point, event.button);
+		break;
 	case EVENT_MOUSE_MOVE:
 		onMouseMove( event.point);
 		break;
@@ -581,51 +548,27 @@ Estatus Cdialog::onEvent( Cevent &event)
 		stat =tryButton( event.mod, event.button);
 		break;
 	case EVENT_DRAG_START:
-		try
-		{
-		m_dragStart =event.point;
-		m_dragObject =findObject( event.point);
-		if ( m_dragObject)
-		{
-			if ( m_dragObject->m_dragEnable ==false)
-			{
-				m_dragObject=NULL;
-			}
-			else
-			{
-				// Cdialog::onEvent  drag start
-				m_dragOffset =m_dragStart-m_dragObject->m_rect.origin()*8;
-			}
-		}
-		}
-		catch(...)
-		{
-		}
+		m_dragObject.start(event.point, findObject( event.point));
 		break;
 	case EVENT_DRAG_MOVE:
-		if ( m_dragObject !=NULL)
+		if (m_dragObject.moveTo(event.point))
 		{
-			event.point -=m_dragOffset;
-			if ( m_dragPoint.x !=event.point.x || event.point.y!=m_dragPoint.y)
-			{
-				m_dragPoint =event.point;
-				invalidate();
-				onDrag( m_dragPoint);
-			}
+			m_world->notifyInvalidate();
+			onDrag(m_dragObject.getDragPoint());
 		}
 		break;
 	case EVENT_DRAG_STOP:
 		try
 		{
-			if ( m_dragObject)
+			if ( !m_dragObject.isEmpty())
 			{
-				if ( m_dragObject->onDragEnd( event.point)==true)
+				if ( m_dragObject.stop( event.point)==true)
 				{
 					invalidate();
 				}
 				else
 				{
-					onDragRelease( dragPoint( event.point), m_dragObject);
+					onDragRelease( m_dragObject.getTopLeft( event.point), m_dragObject.m_dragObject);
 				}
 			}
 		}
@@ -633,7 +576,7 @@ Estatus Cdialog::onEvent( Cevent &event)
 		{
 			// Object already removed...
 		}
-		m_dragObject =NULL;
+		m_dragObject.clean();
 		break;
 	case EVENT_APPMOUSEFOCUS:
 		onMouseFocus();
@@ -654,11 +597,29 @@ Estatus Cdialog::onEvent( Cevent &event)
 		onMinimize();
 		break;
 	case EVENT_LANGUAGE_CHANGE:
-		Cgraphics::m_defaults.country =Cgraphics::m_defaults.next_language( Cgraphics::m_defaults.country);
-		invalidateAll();
+		if ( Cgraphics::m_defaults.next_language)
+		{
+			Cgraphics::m_defaults.country =Cgraphics::m_defaults.next_language( Cgraphics::m_defaults.country);
+			invalidateAll();
+		}
 		break;
 	case EVENT_MAIN_DIALOG:
-		stop( -1); // Main dialog
+		if ( Cgraphics::m_defaults.start_from_main)
+		{
+			Cgraphics::m_defaults.start_from_main( this); // Main dialog
+		}
+		break;
+	case EVENT_PAINT_START:
+		onPaintingStart( event.point);
+		//invalidate();
+		break;
+	case EVENT_PAINT_MOVE:
+		onPaintingMove( event.point);
+		//invalidate();
+		break;
+	case EVENT_PAINT_STOP:
+		onPaintingStop( event.point);
+		//invalidate();
 		break;
 	default:
 	case EVENT_INVALID:
@@ -743,7 +704,7 @@ void Cdialog::onInputBlur()
 /// @post       Key event handled.
 ///
 /*============================================================================*/
-Estatus Cdialog::onKeyUp(keybutton sym, SDLMod mod)
+Estatus Cdialog::onKeyUp(keybutton sym, keymode mod)
 {
 	(void)sym;
 	(void)mod;
@@ -766,21 +727,7 @@ void Cdialog::onMouseFocus()
 /** Drag an object to another location. */
 Cpoint Cdialog::dragPoint( const Cpoint &mouse)
 {
-	Cpoint m=mouse;
-	m =m-m_dragOffset;
-	int x, y;
-	try
-	{
-		x=Cgraphics::m_defaults.width-(m_dragObject->m_rect.width()*8);
-		y=Cgraphics::m_defaults.height-(m_dragObject->m_rect.height()*8);
-	}
-	catch (...)
-	{
-		x =m_dragOffset.x;
-		y =m_dragOffset.y;
-	}
-	m.limit( Cpoint( 0,0), Cpoint( x,y));
-	return m;
+	return m_dragObject.dragTo( mouse);
 }
 
 /*============================================================================*/
@@ -832,49 +779,18 @@ Estatus Cdialog::onKeyPressed( keybutton sym)
  *  @param mod [in] Shift, control etc.
  *  @param sym [in] What key pressed.
  */
-Estatus Cdialog::onButton( SDLMod mod, keybutton sym)
+Estatus Cdialog::tryButton( keymode mod, keybutton sym)
 {
-	(void)mod;
-	(void)sym;
-	return DIALOG_EVENT_PROCESSED;
-}
-
-/** @brief Send a button to all sub-dialogs.
- *  @param mod [in] Shift, control etc.
- *  @param sym [in] What key pressed.
- */
-Estatus Cdialog::tryButton( SDLMod mod, keybutton sym)
-{
-	assert( (int)pthread_self()==m_main_thread);
+	m_world->checkInMainThread();
 	// Also dialogs should be killed in this thread alone!!!!!!
-
-	(void)mod;
 	Estatus stat =DIALOG_EVENT_OPEN;
-	if ( sym !=KEY_NONE)
+	(void)mod;
+
+	if (sym != KEY_NONE)
 	{
-		stat =DIALOG_EVENT_GENERAL;
+		stat = m_world->tryButton(mod,sym);
 		CdialogBase *a;
 
-		g_messageBox.lock();
-		// First try message-boxes
-		for ( a=g_messageBox.firstDialog();
-			  a !=NULL && stat!=DIALOG_EVENT_PROCESSED && stat!=DIALOG_EVENT_EXIT;
-			  a=g_messageBox.nextDialog( a))
-		{
-			Cdialog *t=dynamic_cast<Cdialog*>(a);
-			if (  t->m_visible ==true)
-			{
-				stat =t->onButton( mod, sym);
-				if ( stat==DIALOG_EVENT_EXIT)
-				{
-					stop(0);
-					stat =DIALOG_EVENT_PROCESSED;
-				}
-			}
-		}
-		g_messageBox.unlock();
-
-		//g_myWorld.lock();
 		// Then try all children.
 		for ( a =m_children.lastDialog();
 			  a !=NULL && stat!=DIALOG_EVENT_PROCESSED && stat!=DIALOG_EVENT_EXIT;
@@ -991,32 +907,30 @@ void Cdialog::notifyTouch( const Cpoint &p)
 void Cdialog::insertDragObject()
 {
 	// Now put on the display.
-	if ( m_dragObject !=NULL && m_dragObject->m_graphics !=NULL)
+	if ( !m_dragObject.isEmpty() && m_dragObject.m_dragObject->m_graphics !=NULL)
 	{
-		m_dragObject->m_graphics->lock_keycodes();
-		m_dragObject->onPaint( m_dragPoint.div8(),0);
-		m_dragObject->m_graphics->unlock_keycodes();
+		m_dragObject.onPaint();
 	}
-
 }
 /** @brief Paint the display after all buttons are painted with onPaint() */
 void Cdialog::onDisplay()
 {
-	assert( (int)pthread_self()==m_main_thread);
+	m_world->checkInMainThread();
+
 	try
 	{
 		// Now put on the display.
 		insertDragObject();
-		m_graphics->update();
+		//m_graphics->update();
 	}
 	catch (...)
 	{
 	}
 	try
 	{
-		if (m_dragObject !=NULL && m_dragObject->m_graphics !=NULL)
+		if ( !m_dragObject.isEmpty() && m_dragObject.m_dragObject->m_graphics !=NULL)
 		{
-			m_dragObject->m_graphics->unlock_keycodes();
+			m_dragObject.m_dragObject->m_graphics->unlock_keycodes();
 		}
 	}
 	catch(...)
@@ -1024,57 +938,6 @@ void Cdialog::onDisplay()
 
 	}
 	m_graphics->update();
-}
-
-/*============================================================================*/
-///
-/// @brief 		Add a message box to our system.
-///
-/// @post       Message box added, but not ready to display.
-///
-/*============================================================================*/
-void Cdialog::registerMessageBox(Cdialog *child)
-{
-    g_messageBox.addDialog( child);
-	invalidate();
-}
-
-/*============================================================================*/
-///
-/// @brief 		Remove a message box to our system.
-///
-/// @post       Message box removed, should not be displayed anymore.
-///
-/*============================================================================*/
-void Cdialog::unregisterMessageBox(Cdialog *child)
-{
-	g_messageBox.removeDialog( child);
-	invalidate();
-}
-
-/*============================================================================*/
-///
-/// @brief 		I am the messagebox and want to register.
-///
-/// @post       Message box removed, should not be displayed anymore.
-///
-/*============================================================================*/
-void Cdialog::registerMessageBox()
-{
-	m_isMessageBox=true;
-	Cdialog::registerMessageBox(this);
-}
-
-/*============================================================================*/
-///
-/// @brief 		I am the messagebox and want to unregister.
-///
-/// @post       Message box removed, should not be displayed anymore.
-///
-/*============================================================================*/
-void Cdialog::unregisterMessageBox()
-{
-	Cdialog::unregisterMessageBox(this);
 }
 
 /** @brief Find object for a certain point. Not in sub-dialogs!
@@ -1124,36 +987,12 @@ CdialogObject * Cdialog::findObject( const Cpoint &p)
 /*============================================================================*/
 Cdialog *Cdialog::findDialog( const Cpoint &p)
 {
-	Cdialog *retVal =NULL;
+	Cdialog *retVal =m_world->findDialog(p);
 	CdialogBase *a;
 
-	g_messageBox.lock();
-	for ( a=g_messageBox.lastDialog(); a!=NULL; a=g_messageBox.previousDialog( a))
-	{
-		Cdialog *t=dynamic_cast<Cdialog*>(a);
-		if ( t==NULL)
-		{
-			continue;
-		}
-		if (  t->m_visible ==false)
-		{
-			continue;
-		}
-		if ( t->m_rect.inside( p))
-		{
-			retVal =t;
-			break;
-		}
-		if (p.x==0 && p.y==0)
-		{
-			retVal =t;
-			break;
-		}
-	}
-	g_messageBox.unlock();
 	if ( retVal ==NULL)
 	{
-		g_myWorld.lock();
+		m_world->lock();
 		for ( a=m_children.lastDialog(); a !=NULL; a=m_children.previousDialog( a))
 		{
 			Cdialog *t=dynamic_cast<Cdialog*>(a);
@@ -1176,7 +1015,7 @@ Cdialog *Cdialog::findDialog( const Cpoint &p)
 				break;
 			}
 		}
-		g_myWorld.unlock();
+		m_world->unlock();
 	}
 	if ( retVal ==NULL)
 	{
@@ -1251,13 +1090,13 @@ keybutton Cdialog::findButton( const Cpoint &p)
 	if ( dialog !=NULL)
 	{
 		CswypeDialog *scroll =dynamic_cast<CswypeDialog*>(dialog);
-		if ( scroll)
+		if ( !scroll)
 		{
-			key =scroll->findButton( p);
+			key =m_graphics->m_touch.getKey( q);
 		}
 		else
 		{
-			key =m_graphics->m_touch.getKey( q);
+			key =scroll->findButton( p);
 		}
 	}
 	return key;
@@ -1286,14 +1125,13 @@ bool Cdialog::isSwypeDialog( const Cpoint &p)
 void Cdialog::scrollDialog( const Cpoint &start, const Cpoint &distance)
 {
 	//assert( (int)pthread_self()==m_main_thread);
-
-	g_myWorld.lock();
+	m_world->lock();
 	CswypeDialog *dialog =dynamic_cast<CswypeDialog*>( findDialog( start/8) );
 	if ( dialog)
 	{
 		dialog->scrollRelative( dialog->m_horizontal ? (double)distance.x:(double)distance.y, true);
 	}
-	g_myWorld.unlock();
+	m_world->unlock();
 }
 
 /** Overload to do some with drag release. */
@@ -1303,12 +1141,75 @@ void Cdialog::onDragRelease( const Cpoint &position, CdialogObject * movingObjec
 	(void)movingObject;
 }
 
+/** Create my own graphic layer, so we don't need to repaint everything each time */
+void Cdialog::createMyGraph()
+{
+	m_myGraphics =std::shared_ptr<Cgraphics>( new Cgraphics( m_rect.size(), false) );
+}
+
+/** Overload to do some with drag release. */
+void Cdialog::onPaintingStart( const Cpoint &position)
+{
+	try
+	{
+		CdialogObject *object =findObject( position);
+		if ( object)
+		{
+			object->onPaintingStart( position);
+		}
+	}
+	catch (...)
+	{
+	}
+}
+
+/** Overload to do some with drag release. */
+void Cdialog::onPaintingMove( const Cpoint &position)
+{
+	try
+	{
+		CdialogObject *object =findObject( position);
+		if ( object)
+		{
+			object->onPaintingMove( position);
+		}
+	}
+	catch (...)
+	{
+	}
+}
+
+/** Overload to do some with drag release. */
+void Cdialog::onPaintingStop( const Cpoint &position)
+{
+	try
+	{
+		CdialogObject *object =findObject( position);
+		if ( object)
+		{
+			object->onPaintingStop( position);
+		}
+	}
+	catch (...)
+	{
+	}
+}
+
 /** At start of executing the dialog */
 void Cdialog::startExecute()
 {
 	//int n=pthread_mutex_trylock( &m_dlgMutex); //EBUSY);
 	//m_prevLock =( n!=0);
 	//pthread_mutex_unlock( &m_dlgMutex);
+}
+
+/** Render to the output graph */
+void Cdialog::onRender()
+{
+	if (m_myGraphics.get() !=NULL)
+	{
+		m_graphics->renderGraphics(m_myGraphics.get(), m_rect*8);
+	}
 }
 
 /** At stop of executing the dialog */

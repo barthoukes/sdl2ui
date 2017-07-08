@@ -4,9 +4,34 @@
  *  Created on: 23 dec. 2011
  *      Author: mensfort
  */
+/*------------------------------------------------------------------------------
+ ** Copyright (C) 2011, 2014, 2015
+ ** Houkes Horeca Applications
+ **
+ ** This file is part of the SDL2UI Library.  This library is free
+ ** software; you can redistribute it and/or modify it under the
+ ** terms of the GNU General Public License as published by the
+ ** Free Software Foundation; either version 3, or (at your option)
+ ** any later version.
+
+ ** This library is distributed in the hope that it will be useful,
+ ** but WITHOUT ANY WARRANTY; without even the implied warranty of
+ ** MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
+ ** GNU General Public License for more details.
+
+ ** Under Section 7 of GPL version 3, you are granted additional
+ ** permissions described in the GCC Runtime Library Exception, version
+ ** 3.1, as published by the Free Software Foundation.
+
+ ** You should have received a copy of the GNU General Public License and
+ ** a copy of the GCC Runtime Library Exception along with this program;
+ ** see the files COPYING3 and COPYING.RUNTIME respectively.  If not, see
+ ** <http://www.gnu.org/licenses/>
+ **===========================================================================*/
 
 #pragma once
 
+/*------------- Standard includes --------------------------------------------*/
 #include "sdl_dialog_object.h"
 #include "sdl_graphics.h"
 #include "sdl_rect.h"
@@ -20,6 +45,8 @@ typedef enum
 	FILL_GRADIENT, ///< Fill colour 1 to 2.
 	FILL_PYRAMID, ///< First colour in middle.
 	FILL_IMAGE, ///< Fill with image.
+	FILL_CIRCULAR, ///< Fill with circular background
+	FILL_PIE ///< Fill pie with 2 parts
 } EfillType;
 
 // Light factors.
@@ -42,6 +69,7 @@ public:
 	void onPaintImageButton();
 	void setRadius( int radius) { m_radius=radius; }
 	int getRadius() { return m_radius; }
+	bool pieColour( int dx, int dy);
 	void setBackground( const std::string &image)
 	{
 		m_image =image;
@@ -50,6 +78,9 @@ public:
 	virtual ~Cbackground();
 	void setBorderWidth( int width) { m_borderWidth=width; }
 	void setCode( keybutton key) { m_key=key; }
+	colour getColour() { return m_col1; }
+	void setCorner(int cr) { m_pieCorner =cr%360; }
+
 private:
 	colour calcColour( colour col1, colour col2, double fraction);
 
@@ -61,6 +92,8 @@ private:
 	int         m_radius;       ///< Corner size.
 	std::string m_image;		///< Background for button.
 	int m_R1, m_G1, m_B1, m_R2, m_G2, m_B2;
+	int			m_pieCorner;	///< Corner pie.
+public:
 	int			m_borderWidth;  ///< To reduce the painting.
 };
 

@@ -1,6 +1,6 @@
 /*============================================================================*/
 /**  @file       sdl_dialog_event.cpp
- **  @ingroup    zhongcan_sdl
+ **  @ingroup    sdl2ui
  **  @brief		 Default dialog.
  **
  **  Get event from input devices.
@@ -11,17 +11,34 @@
  **              CdialogEvent
  */
 /*------------------------------------------------------------------------------
- **  Copyright (c) Bart Houkes, 28 jan 2011
- ** 
- **  Copyright notice:
- **  This software is property of Bart Houkes.
- **  Unauthorized duplication and disclosure to third parties is forbidden.
- **============================================================================*/
+ ** Copyright (C) 2011, 2014, 2015
+ ** Houkes Horeca Applications
+ **
+ ** This file is part of the SDL2UI Library.  This library is free
+ ** software; you can redistribute it and/or modify it under the
+ ** terms of the GNU General Public License as published by the
+ ** Free Software Foundation; either version 3, or (at your option)
+ ** any later version.
+
+ ** This library is distributed in the hope that it will be useful,
+ ** but WITHOUT ANY WARRANTY; without even the implied warranty of
+ ** MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
+ ** GNU General Public License for more details.
+
+ ** Under Section 7 of GPL version 3, you are granted additional
+ ** permissions described in the GCC Runtime Library Exception, version
+ ** 3.1, as published by the Free Software Foundation.
+
+ ** You should have received a copy of the GNU General Public License and
+ ** a copy of the GCC Runtime Library Exception along with this program;
+ ** see the files COPYING3 and COPYING.RUNTIME respectively.  If not, see
+ ** <http://www.gnu.org/licenses/>
+ **===========================================================================*/
 
 /*------------- Standard includes --------------------------------------------*/
 #include "sdl_dialog_event.h"
 #include "sdl_dialog_object.h"
-
+#include "sdl_keybutton.h"
 #define RANDOM(x)		(int) ((x) * (rand() / (RAND_MAX + 1.0)))
 
 /*============================================================================*/
@@ -30,22 +47,26 @@
 ///
 /*============================================================================*/
 CdialogEvent::CdialogEvent()
-: m_interface( NULL)
-, m_mouseStatus( MOUSE_RELEASED)
-, m_minimumClickTime( 0)
-, m_numberOfPresses( 0)
-, m_lastMouse( 0,0)
-, m_repeatDelay( 0)
-, m_repeatSpeed( 0)
-, m_repeatCount( 0)
-, m_repeatButton( KEY_NONE)
-, m_mousePressedLeft( false)
-, m_scrollStart( 0,0)
-, m_dragPoint( 0,0)
+: m_interface(NULL)
+, m_inputStat(MOUSE_RELEASED)
+, m_mouseStat(MOUSE_RELEASED)
+, m_minimumClickTime(0)
+, m_numberOfPresses(0)
+, m_lastMousePos(0,0)
+, m_inputMousePos(0,0)
+, m_repeatDelay(0)
+, m_repeatSpeed(0)
+, m_repeatCount(0)
+, m_repeatButton(KEY_NONE)
+, m_mousePressedLeft(false)
+, m_scrollStart(0,0)
+, m_dragPoint(0,0)
 , m_dragStartPixels(0)
-, m_press( 0,0)
+, m_press(0,0)
 , m_isPressed(false)
-, m_idiot( false)
+, m_longDebounced(false)
+, m_idiot(false)
+, m_debugPosition(0,0)
 {
 	m_dragStartPixels =Cgraphics::m_defaults.drag_start_pixels;
 	m_dragStartPixels =m_dragStartPixels*m_dragStartPixels;
@@ -53,10 +74,14 @@ CdialogEvent::CdialogEvent()
 	m_repeatDelay =Cgraphics::m_defaults.repeat_delay;
 	m_minimumDragTime =Cgraphics::m_defaults.minimum_drag_time;
 	m_minimumClickTime =Cgraphics::m_defaults.minimum_click_time;
+	m_debounceTime =Cgraphics::m_defaults.touch_debounce_time;
+	m_debounceDist =Cgraphics::m_defaults.touch_debounce_distance;
+
 	while ( m_events.size()>0)
 	{
 		m_events.pop_front();
 	}
+	m_keyFile.init();
 #ifdef ZHONGCAN_MULTI_THREAD
 	start();
 #endif
@@ -72,9 +97,10 @@ CdialogEvent::~CdialogEvent()
 #ifdef ZHONGCAN_MULTI_THREAD
 	stop();
 #endif
+	m_keyFile.close();
 }
 
-/** Do button repeats if a button is pressed longer, this should be done faster and faster.
+/** THREAD Do button repeats if a button is pressed longer, this should be done faster and faster.
  *  Do button repeats for touch screen (mouse).
  *  Do Drag and drop for items which can be dragged.
  *  Move items during dragging.
@@ -87,119 +113,106 @@ void CdialogEvent::work()
 	bool found =false;
 
 	// Get events
-	for ( int n=0; n<10; n++)
+	for (int n=0; n<25; n++)
 	{
+		event.type=0;
+		if ( SDL_PollEvent(&event)!=1)
+		{
+			break;
+		}
+		if (event.type ==EVENT_INVALID)
+		{
+			continue;
+		}
+		Cevent c(&event, m_interface ? m_interface->spaceIsLanguage():true, false);
+		// handle the event
+		handleEvent(c);
+	}
+	switch (m_inputStat)
+	{
+	case MOUSE_PRESS:
 		lock();
-		if ( SDL_PollEvent( &event)>0)
+		if ( m_longDebounced==false && m_mouseLongDebounce.elapsed()>Cgraphics::m_defaults.touch_debounce_long_time)
 		{
-			unlock();
-			bool spaceIsLanguage =m_interface ? m_interface->spaceIsLanguage():true;
-			Cevent c( &event, spaceIsLanguage, false);
-
-			handleEvent( c);
-			// CdialogEvent::work event
-			m_keyFile.onEvent( &event);
-			if ( c.type ==EVENT_KEY_PRESS)
-			{
-				m_idiot =false;
-			}
-			found =true;
+			Cevent c(EVENT_TOUCH_LONG, KEY_NONE, m_inputMousePos, false);
+			m_events.push_back(c);
+			m_longDebounced =true;
 		}
-		else
+		unlock();
+		break;
+	case MOUSE_RELEASE_DEBOUNCE:
+		lock();
+		if ( m_debounceTime==0 || m_mouseDebounce.elapsed()>m_debounceTime)
 		{
-			unlock();
-		}
-		switch (m_mouseStatus)
-		{
-		case MOUSE_RELEASED: ///< No activity.
-			break;
-		case MOUSE_START_DRAG: ///< Wait a second before starting to drag.
-			if ( m_mousePress.elapsed()>m_minimumDragTime)
-			{
-				found =true;
-				m_mouseStatus =MOUSE_DRAG;
-				m_events.push_back( Cevent( EVENT_DRAG_START, m_press, false));
-				m_events.push_back( Cevent( EVENT_DRAG_MOVE, m_lastMouse, false));
-			}
-			break;
+			// Really press... after debounce 5 msec.
+			//Cgraphics::m_defaults.log("touch release send!");
+			Cevent c( EVENT_TOUCH_RELEASE, KEY_NONE, m_inputMousePos, false);
+			m_inputStat =MOUSE_RELEASED;
+			m_events.push_back(c);
 
-		case MOUSE_START_SCROLL_OR_DRAG: ///< Start a scroll dialog.
-			if ( m_mousePress.elapsed()>m_minimumDragTime)
+		}
+		unlock();
+		break;
+	case MOUSE_PRESS_DEBOUNCE:
+		lock();
+		if ( m_debounceTime==0 || m_mouseDebounce.elapsed()>m_debounceTime)
+		{
+			// Really release... after debounce 5 msec.
+			//Cgraphics::m_defaults.log("touch press send??");
+			Cevent c( EVENT_TOUCH_PRESS, KEY_NONE, m_inputMousePos, false);
+			m_inputStat =MOUSE_PRESS;
+			m_events.push_back(c);
+		}
+		unlock();
+		break;
+	default:
+		break;
+	}
+	if ( m_idiot ==true)
+	{
+		if ( m_events.size()>3)
+		{
+			return;
+		}
+		//keybutton k =(keybutton)(RANDOM(500));
+		int x=RANDOM(10);
+		int xx =RANDOM( Cgraphics::m_defaults.width);
+		int yy =RANDOM( Cgraphics::m_defaults.height);
+
+		// Do some random action.
+		switch (m_inputStat)
+		{
+		case MOUSE_RELEASED:
+			///< Create random mouse press.
+			if (x >5)
 			{
-				found =true;
-				m_mouseStatus =MOUSE_SCROLL;
-				if ( m_interface)
-				{
-					m_interface->scrollDialog( m_scrollStart, m_scrollStart-m_lastMouse);
+				handleMousePress( Cpoint(xx,yy));
 				}
-			}
 			break;
-		case MOUSE_SCROLL: ///< Scrolling window.
-			break;
-		case MOUSE_DRAG: ///< Busy dragging.
+		case MOUSE_PRESS_DEBOUNCE:
+		case MOUSE_RELEASE_DEBOUNCE:
 			break;
 		case MOUSE_PRESS: ///< Press mouse without drag, possible repeat.
-			break;
-		case MOUSE_DRAG_DIALOG:	///< Drag entire dialog.
-			break;
-		}
-		if ( m_idiot ==true)
-		{
-			if ( m_events.size()>3)
+		case MOUSE_SCROLL: ///< Scrolling window.
+		case MOUSE_DRAG: ///< Busy dragging.
+		case MOUSE_PAINT:
+		default:
+			if (x ==3)
 			{
-				return;
+				// Mouse release.
+				handleMouseRelease( Cpoint(xx,yy));
 			}
-			//keybutton k =(keybutton)(RANDOM(500));
-			int x=RANDOM(10);
-			int xx =RANDOM( Cgraphics::m_defaults.width);
-			int yy =RANDOM( Cgraphics::m_defaults.height);
-
-			// Do some random action.
-			switch (m_mouseStatus)
+			else
 			{
-			case MOUSE_RELEASED:
-				///< Create random mouse press.
-				if (x >5)
-				{
-					event.type =SDL_MOUSEBUTTONDOWN;
-					event.motion.x =xx;
-					event.motion.y =yy;
-					event.button.button =SDL_BUTTON_LEFT;
-					bool spaceIsLanguage =m_interface ? m_interface->spaceIsLanguage():true;
-					Cevent c( &event, spaceIsLanguage, true);
-					handleEvent( c);
-				}
-				break;
-			case MOUSE_PRESS: ///< Press mouse without drag, possible repeat.
-			case MOUSE_START_DRAG: ///< Wait a second before starting to drag.
-			case MOUSE_START_SCROLL_OR_DRAG: ///< Start a scroll dialog.
-			case MOUSE_SCROLL: ///< Scrolling window.
-			case MOUSE_DRAG: ///< Busy dragging.
-			case MOUSE_DRAG_DIALOG:	///< Drag entire dialog.
-				// In some cases do a mouse release at same position.
-				if (x ==3)
-				{
-					// Mouse release.
-					event.type =SDL_MOUSEBUTTONUP;
-					event.motion.x =xx;
-					event.motion.y =yy;
-					event.button.button =SDL_BUTTON_LEFT;
-					bool spaceIsLanguage =m_interface ? m_interface->spaceIsLanguage():true;
-					Cevent c( &event, spaceIsLanguage, true);
-					handleEvent( c);
-				}
-				else
-				{
-					// Mouse move.
-					event.type =SDL_MOUSEMOTION;
-					event.motion.x =xx;
-					event.motion.y =yy;
-					bool spaceIsLanguage =m_interface ? m_interface->spaceIsLanguage():true;
-					Cevent c( &event, spaceIsLanguage, true);
-					handleEvent( c);
-				}
-				break;
+				// Mouse move.
+				xx/=50;
+				yy/=40;
+				xx+=m_lastMousePos.x;
+				yy+=m_lastMousePos.y;
+				event.type =SDL_MOUSEMOTION;
+				handleMouseMove( Cpoint(xx,yy));
 			}
+			break;
 		}
 	}
 	if ( found ==false)
@@ -274,7 +287,7 @@ Cevent::Cevent( SDL_Event *event, bool spaceIsLanguage, bool test)
 		{
 			break;
 		}
-		mod = (SDLMod)(event->key.keysym.mod &(~KMOD_CAPS));
+		mod = (keymode)(event->key.keysym.mod &(~KMOD_CAPS));
 		if ( event->key.keysym.sym ==SDLK_SPACE && spaceIsLanguage)
 		{
 			button =KEY_SPACE;
@@ -299,16 +312,16 @@ Cevent::Cevent( SDL_Event *event, bool spaceIsLanguage, bool test)
 		switch (event->key.keysym.sym)
 		{
 		case SDLK_KP_PLUS: 	button =KEY_PLUS; break;
-		case SDLK_KP0: 		button =KEY_0; break;
-		case SDLK_KP1: 		button =KEY_1; break;
-		case SDLK_KP2: 		button =KEY_2; break;
-		case SDLK_KP3: 		button =KEY_3; break;
-		case SDLK_KP4: 		button =KEY_4; break;
-		case SDLK_KP5: 		button =KEY_5; break;
-		case SDLK_KP6: 		button =KEY_6; break;
-		case SDLK_KP7: 		button =KEY_7; break;
-		case SDLK_KP8: 		button =KEY_8; break;
-		case SDLK_KP9: 		button =KEY_9; break;
+//		case SDLK_KP0: 		button =KEY_0; break;
+//		case SDLK_KP1: 		button =KEY_1; break;
+//		case SDLK_KP2: 		button =KEY_2; break;
+//		case SDLK_KP3: 		button =KEY_3; break;
+//		case SDLK_KP4: 		button =KEY_4; break;
+//		case SDLK_KP5: 		button =KEY_5; break;
+//		case SDLK_KP6: 		button =KEY_6; break;
+//		case SDLK_KP7: 		button =KEY_7; break;
+//		case SDLK_KP8: 		button =KEY_8; break;
+//		case SDLK_KP9: 		button =KEY_9; break;
 		case SDLK_KP_PERIOD: button =KEY_DOT; break;
 		case SDLK_KP_DIVIDE: button =KEY_FORWARDSLASH; break;
 		case SDLK_KP_MULTIPLY: button =KEY_STAR; break;
@@ -333,11 +346,14 @@ Cevent::Cevent( SDL_Event *event, bool spaceIsLanguage, bool test)
 		case SDL_BUTTON_MIDDLE: // not used.
 			type =EVENT_INVALID;
 			break;
-		case SDL_BUTTON_WHEELUP:
-			type =EVENT_WHEEL_UP;
-			break;
-		case SDL_BUTTON_WHEELDOWN:
-			type =EVENT_WHEEL_DOWN;
+		//case SDL_BUTTON_WHEELUP:
+		//	type =EVENT_WHEEL_UP;
+		//	break;
+		//case SDL_BUTTON_WHEELDOWN:
+		//	type =EVENT_WHEEL_DOWN;
+		//	break;
+		default:
+			//Cgraphics::m_defaults.log("Cevent::Cevent ???");
 			break;
 		}
 		break;
@@ -349,11 +365,14 @@ Cevent::Cevent( SDL_Event *event, bool spaceIsLanguage, bool test)
 		case SDL_BUTTON_LEFT:
 			type =EVENT_TOUCH_RELEASE;
 			break;
-		case SDL_BUTTON_WHEELUP:
-		case SDL_BUTTON_WHEELDOWN:
+		//case SDL_BUTTON_WHEELUP:
+		//case SDL_BUTTON_WHEELDOWN:
 		case SDL_BUTTON_RIGHT:
 		case SDL_BUTTON_MIDDLE: // not used.
 			type =EVENT_INVALID;
+			break;
+		default:
+			//Cgraphics::m_defaults.log("Cevent::Cevent 2???");
 			break;
 		}
 		break;
@@ -364,6 +383,14 @@ Cevent::Cevent( SDL_Event *event, bool spaceIsLanguage, bool test)
 		point =Cpoint( event->motion.x, event->motion.y);
 		which =0;
 		break;
+
+	case SDL_JOYBUTTONDOWN:
+	   	type =EVENT_TOUCH_LONG;
+	   	mod =KMOD_NONE;
+	   	button =KEY_NONE;
+	   	point =Cpoint( event->button.x, event->button.y);
+		break;
+
 	case SDL_QUIT:
 		type =EVENT_QUIT;
 		break;
@@ -391,12 +418,13 @@ Cevent::Cevent( SDL_Event *event, bool spaceIsLanguage, bool test)
 	}
 }
 
-/** Handle event after the dialog wants a new event. Lock the instance on m_events.
+/** THREAD Handle event after the dialog wants a new event. Lock the instance on m_events. Run from the event thread, not the dialog thread!!
  *  post: All events in the queue are handled.
  *  @param event [in] What event to handle.
  */
 void CdialogEvent::handleEvent( Cevent &event)
 {
+	//Cgraphics::m_defaults.log("handleEvent %d %s!", event.type, event.toString().c_str());
 	switch ( event.type)
 	{
 	case EVENT_APPINPUTFOCUS:
@@ -412,14 +440,17 @@ void CdialogEvent::handleEvent( Cevent &event)
 		break;
 
 	case EVENT_TOUCH_PRESS:
+		m_debugPosition=event.point;
 		handleMousePress( event.point);
 		break;
 
 	case EVENT_TOUCH_RELEASE:
+		m_debugPosition=event.point;
 		handleMouseRelease( event.point);
 		break;
 
 	case EVENT_TOUCH_MOVE:
+		m_debugPosition=event.point;
 		handleMouseMove( event.point);
 		break;
 
@@ -441,34 +472,133 @@ void CdialogEvent::handleEvent( Cevent &event)
 	}
 }
 
-/** @brief Handle when we release the mouse now.
+/** @brief THREAD Handle when we release the mouse now. Run from the event thread, not the dialog thread!!
  *  @param p [in] Where the finger/mouse has left the screen/stopped pressing.
  */
 void CdialogEvent::handleMouseRelease( const Cpoint &p)
 {
+	lock();
+	switch ( m_inputStat )
+	{
+	case MOUSE_PRESS:
+		if ( m_debounceTime==0)
+		{
+			// Really press... after debounce 5 msec.
+			//Cgraphics::m_defaults.log("touch release send!");
+			m_inputMousePos =p;
+			Cevent c( EVENT_TOUCH_RELEASE, KEY_NONE, m_inputMousePos, false);
+			m_inputStat =MOUSE_RELEASED;
+			m_events.push_back(c);
+		}
+		else
+		{
+			//Cgraphics::m_defaults.log("mouse release in press %d,%d", p.x, p.y);
+			m_inputMousePos =p;
+			m_inputStat =MOUSE_RELEASE_DEBOUNCE;
+		}
+		break;
+	case MOUSE_RELEASED:
+	case MOUSE_PRESS_DEBOUNCE:
+	case MOUSE_RELEASE_DEBOUNCE:
+		break;
+	default:
+		m_inputStat =MOUSE_RELEASED;
+		break;
+	}
+	unlock();
+}
+
+void CdialogEvent::handleMouseLong( CeventInterface *callback, const Cevent &c)
+{
+	lock();
 	keybutton key;
 	CdialogObject *object;
-	(void)p;
+	m_lastMousePos =c.point;
+	m_numberOfPresses++;
+	m_press =c.point;
+
+	if ( m_interface ==NULL)
+	{
+		unlock();
+		return;
+	}
+
+	// Check for scroll window.
+	bool isScrollDialog =false;
+	try
+	{
+		isScrollDialog =m_interface->isSwypeDialog( c.point);
+	}
+	catch (...)
+	{
+		// Not a valid scroll dialog anymore.
+	}
+	if ( isScrollDialog)
+	{
+		// Yes, we have a scroll dialog.
+		(void)callback->onEvent(Cevent( EVENT_TOUCH_LONG, c.point, false));
+		unlock();
+		return;
+	}
+
+	// Check which button pressed on which window.
+	object =NULL;
+	if ( object)
+	{
+		// Drag object or not.
+		key=object->m_code;
+		if ( object->m_painting)
+		{
+			unlock();
+			return;
+		}
+	}
+	else
+	{
+		try
+		{
+			key =m_interface->findButton( c.point );
+		}
+		catch (...)
+		{
+			key =KEY_NONE;
+		}
+	}
+	// Single button press.
+	callback->onEvent(Cevent( EVENT_TOUCH_LONG, key, c.point, false));
+	unlock();
+}
+
+void CdialogEvent::handleMouseRelease( CeventInterface *callback, const Cevent &c)
+{
+	keybutton key;
+	CdialogObject *object;
+	(void)c;
 	lock();
 	m_isPressed =false;
-	switch (m_mouseStatus)
+	if ( m_interface ==NULL)
+	{
+		m_mouseStat =MOUSE_RELEASED;
+	}
+	switch (m_mouseStat)
 	{
 	case MOUSE_RELEASED: // Already released?
 		break;
+
 	case MOUSE_DRAG:
-		m_mouseStatus =MOUSE_RELEASED;
-		m_events.push_back( Cevent( EVENT_DRAG_STOP, p, false));
+		m_mouseStat =MOUSE_RELEASED;
+		callback->onEvent(Cevent( EVENT_DRAG_STOP, c.point, false));
 		break;
 
 	case MOUSE_START_DRAG: // Stop drag, send button to press object.
-	 	object =m_interface->findObject( p);
+	 	object =m_interface ? m_interface->findObject(c.point):NULL;
 		if ( object ==NULL)
 		{
 			break;
 		}
 		try
 		{
-			m_events.push_back( Cevent( EVENT_MOUSE_CLICK, object->m_code, p, false));
+			callback->onEvent(Cevent(EVENT_MOUSE_CLICK, object->m_code, c.point, false));
 		}
 		catch (...)
 		{
@@ -480,38 +610,88 @@ void CdialogEvent::handleMouseRelease( const Cpoint &p)
 		key =m_interface->findButton( m_scrollStart);
 		if ( key!=KEY_NONE)
 		{
-			m_events.push_back( Cevent( EVENT_MOUSE_CLICK, key, m_scrollStart, false));
+			callback->onEvent(Cevent(EVENT_MOUSE_CLICK, key, m_scrollStart, false));
 		}
 		break;
 
 	case MOUSE_SCROLL:
-		m_events.push_back( Cevent( EVENT_TOUCH_RELEASE, m_scrollStart, false));
+		callback->onEvent(Cevent(EVENT_TOUCH_RELEASE, m_scrollStart, false));
+		break;
+
+	case MOUSE_PAINT:
+		callback->onEvent(Cevent(EVENT_PAINT_STOP, c.point, false));
 		break;
 
 	case MOUSE_PRESS:
 	case MOUSE_DRAG_DIALOG:
 		break;
+	default: // No debounce commands here
+		break;
 	}
-	m_mouseStatus =MOUSE_RELEASED;
+	m_mouseStat =MOUSE_RELEASED;
 	unlock();
 }
 
-/** Handle mouse event when the user requests an event.
+/** THREAD Handle mouse event when the user requests an event. Run from the event thread, not the dialog thread!!
  *  @param p [in] Location where we move the mouse to
  */
 void CdialogEvent::handleMouseMove( const Cpoint &p)
 {
+	switch (m_inputStat)
+	{
+	case MOUSE_RELEASE_DEBOUNCE:
+		lock();
+		//Cgraphics::m_defaults.log("move during debounce release %d,%d", p.x, p.y);
+		if ( m_inputMousePos.distance(p)>=m_debounceDist)
+		{
+			m_events.push_back( Cevent( EVENT_TOUCH_MOVE, p, false));
+			m_inputMousePos =p;
+			m_longDebounced =true;
+			m_mouseDebounce.setTime(10000,100,2);
+		}
+		unlock();
+		break;
+	default:
+	case MOUSE_PRESS_DEBOUNCE:
+	case MOUSE_RELEASED: ///< No activity.
+		break;
+	case MOUSE_SCROLL:
+	case MOUSE_PRESS:
+		lock();
+		//Cgraphics::m_defaults.log("move during press %d,%d", p.x, p.y);
+		if ( m_inputMousePos.distance(p)>=m_debounceDist)
+		{
+			m_events.push_back( Cevent( EVENT_TOUCH_MOVE, p, false));
+			m_longDebounced =true;
+			m_inputMousePos =p;
+		}
+		unlock();
+		break;
+	}
+}
+
+void CdialogEvent::handleMouseMove( CeventInterface *callback, const Cevent &c)
+{
 	lock();
-	switch (m_mouseStatus)
+
+	if ( m_interface ==NULL)
+	{
+		m_mouseStat =MOUSE_RELEASED;
+	}
+	switch (m_mouseStat)
 	{
 	case MOUSE_RELEASED: ///< No activity.
 		break;
+	case MOUSE_PAINT:
+		callback->onEvent(Cevent( EVENT_PAINT_MOVE, c.point, false));
+		break;
+
 	case MOUSE_START_DRAG: ///< Wait a second before starting to drag.
-		if ( m_press.distance( m_lastMouse)>m_dragStartPixels)
+		if ( m_press.distance( m_lastMousePos)>m_dragStartPixels)
 		{
-			m_mouseStatus =MOUSE_DRAG;
-			m_events.push_back( Cevent( EVENT_DRAG_START, m_press, false));
-			m_events.push_back( Cevent( EVENT_DRAG_MOVE, p, false));
+			m_mouseStat =MOUSE_DRAG;
+			callback->onEvent(Cevent( EVENT_DRAG_START, m_press, false));
+			callback->onEvent(Cevent( EVENT_DRAG_MOVE, c.point, false));
 			// Tell where we go to the scroll dialog.
 			//if ( m_interface)
 			//{
@@ -520,77 +700,109 @@ void CdialogEvent::handleMouseMove( const Cpoint &p)
 		}
 		break;
 	case MOUSE_START_SCROLL_OR_DRAG: ///< Start a scroll dialog.
-		if ( m_interface->isScrollDragDialog(p/8))
+		if ( m_interface->isScrollDragDialog(c.point/8))
 		{
 			// Check if it's horizontal or vertical.
 			int dist_slider, dist_object;
-			if ( m_interface->isHorizontalScrollDialog(p/8))
+			if ( m_interface->isHorizontalScrollDialog(c.point/8))
 			{
-				dist_slider =m_scrollStart.horizontalDistance( m_lastMouse);
-				dist_object =m_scrollStart.verticalDistance( m_lastMouse);
+				dist_slider =m_scrollStart.horizontalDistance(m_lastMousePos);
+				dist_object =m_scrollStart.verticalDistance(m_lastMousePos);
 			}
 			else
 			{
-				dist_object =m_scrollStart.horizontalDistance( m_lastMouse);
-				dist_slider =m_scrollStart.verticalDistance( m_lastMouse);
+				dist_object =m_scrollStart.horizontalDistance(m_lastMousePos);
+				dist_slider =m_scrollStart.verticalDistance(m_lastMousePos);
 			}
 			if ( dist_object*dist_object >m_dragStartPixels)
 			{
-				m_mouseStatus =MOUSE_DRAG;
-				m_events.push_back( Cevent( EVENT_DRAG_START, m_press, false));
-				m_events.push_back( Cevent( EVENT_DRAG_MOVE, p, false));
+				m_mouseStat =MOUSE_DRAG;
+				callback->onEvent(Cevent( EVENT_DRAG_START, m_press, false));
+				callback->onEvent(Cevent( EVENT_DRAG_MOVE, c.point, false));
 			}
 			else if ( dist_slider*dist_slider >m_dragStartPixels)
 			{
-				m_mouseStatus =MOUSE_SCROLL;
+				m_mouseStat =MOUSE_SCROLL;
 				// Tell where we go to the scroll dialog.
 				if ( m_interface)
 				{
-					m_interface->scrollDialog( m_scrollStart, m_scrollStart-p);
+					m_interface->scrollDialog( m_scrollStart, m_scrollStart-c.point);
 				}
 			}
 		}
-		else if ( m_scrollStart.distance( m_lastMouse)>m_dragStartPixels)
+		else if ( m_scrollStart.distance( m_lastMousePos)>m_dragStartPixels)
 		{
-			m_mouseStatus =MOUSE_SCROLL;
+			m_mouseStat =MOUSE_SCROLL;
 			// Tell where we go to the scroll dialog.
 			if ( m_interface)
 			{
-				m_interface->scrollDialog( m_scrollStart, m_scrollStart-p);
+				m_interface->scrollDialog( m_scrollStart, m_scrollStart-c.point);
 			}
 		}
 		break;
 	case MOUSE_SCROLL: ///< Scrolling window.
 		// Tell where we go to the scroll dialog.
-		m_interface->scrollDialog( m_scrollStart, m_lastMouse-p);
+		m_interface->scrollDialog(m_scrollStart, m_lastMousePos-c.point);
 		break;
 	case MOUSE_DRAG: ///< Busy dragging object.
-		m_events.push_back( Cevent( EVENT_DRAG_MOVE, p, false));
+		callback->onEvent(Cevent(EVENT_DRAG_MOVE, c.point, false));
 		//m_mouseStatus =MOUSE_RELEASED;
 		//m_events.push( Cevent( EVENT_DRAG_STOP, p, false));
 		break;
 	case MOUSE_PRESS: ///< Press mouse without drag, possible repeat.
-		m_events.push_back( Cevent( EVENT_MOUSE_MOVE, p, false));
+		callback->onEvent(Cevent(EVENT_MOUSE_MOVE, c.point, false));
 		break;
 	case MOUSE_DRAG_DIALOG:	///< Drag entire dialog.
 		break;
+	default: // No debounce commands here
+		break;
 	}
-	m_lastMouse =p;
+	m_lastMousePos =c.point;
 	unlock();
 }
 
-/** @brief New mouse press. Run from any thread.
+/** @brief THREAD New mouse press. Run from the event thread, not the dialog thread!!
  *  @param p [in] Location mouse press.
  */
 void CdialogEvent::handleMousePress( const Cpoint &p)
+{
+	switch ( m_inputStat )
+	{
+	case MOUSE_RELEASED:
+	{
+		lock();
+		//Cgraphics::m_defaults.log("press");
+		//Cgraphics::m_defaults.log("touch press send %d,%d!", p.x, p.y);
+		m_inputMousePos =p;
+		Cevent c( EVENT_TOUCH_PRESS, KEY_NONE, m_inputMousePos, false);
+		m_mouseLongDebounce.setTime(5000000, 2000, 2);
+		m_longDebounced =false;
+		m_inputStat =MOUSE_PRESS;
+		m_events.push_back(c);
+
+//		m_mouseDebounce.setTime( 1000000, 5000,2);
+//		m_inputStat =MOUSE_PRESS_DEBOUNCE;
+//		m_inputMousePos =p;
+		unlock();
+		break;
+	}
+	default:
+	case MOUSE_RELEASE_DEBOUNCE:
+	case MOUSE_PRESS_DEBOUNCE:
+		//Cgraphics::m_defaults.log("press unused");
+		break;
+	}
+}
+
+void CdialogEvent::handleMousePress(CeventInterface *callback, const Cevent &c)
 {
 	lock();
 	keybutton key;
 	CdialogObject *object;
 	m_mousePress.setTime( 10000000, 500,2);
-	m_lastMouse =p;
+	m_lastMousePos =c.point;
 	m_numberOfPresses++;
-	m_press =p;
+	m_press =c.point;
 	m_isPressed =true;
 
 	if ( m_interface ==NULL)
@@ -603,7 +815,7 @@ void CdialogEvent::handleMousePress( const Cpoint &p)
 	bool isScrollDialog =false;
 	try
 	{
-		isScrollDialog =m_interface->isSwypeDialog( p);
+		isScrollDialog =m_interface->isSwypeDialog( c.point);
 	}
 	catch (...)
 	{
@@ -612,10 +824,10 @@ void CdialogEvent::handleMousePress( const Cpoint &p)
 	if ( isScrollDialog)
 	{
 		// Yes, we have a scroll dialog.
-		m_scrollStart =p;
-		m_mouseStatus =MOUSE_START_SCROLL_OR_DRAG;
+		m_scrollStart =c.point;
+		m_mouseStat =MOUSE_START_SCROLL_OR_DRAG;
 		m_mousePress.setTime( m_minimumDragTime, 100,2);
-		m_events.push_back( Cevent( EVENT_TOUCH_PRESS, p, false));
+		(void)callback->onEvent(Cevent( EVENT_TOUCH_PRESS, c.point, false));
 		unlock();
 		return;
 	}
@@ -624,7 +836,8 @@ void CdialogEvent::handleMousePress( const Cpoint &p)
 	object =NULL;
 	try
 	{
-		m_interface->notifyTouch( p);
+		object =m_interface->findObject( c.point );
+		m_interface->notifyTouch( c.point );
 	}
 	catch (...)
 	{
@@ -633,18 +846,26 @@ void CdialogEvent::handleMousePress( const Cpoint &p)
 	if ( object)
 	{
 		// Drag object or not.
+		key=object->m_code;
 		if ( object->m_dragEnable)
 		{
-			m_mouseStatus =MOUSE_START_DRAG;
+			m_mouseStat =MOUSE_START_DRAG;
 			m_mousePress.setTime( m_minimumDragTime, 100,2);
-			m_events.push_back( Cevent( EVENT_TOUCH_PRESS, p, false));
+			m_interface->onEvent( Cevent( EVENT_TOUCH_PRESS, c.point, false) );
+		}
+		if ( object->m_painting)
+		{
+			m_mouseStat =MOUSE_PAINT;
+			m_interface->onEvent( Cevent( EVENT_PAINT_START, c.point, false) );
+			unlock();
+			return;
 		}
 	}
 	else
 	{
 		try
 		{
-			key =m_interface->findButton( p);
+			key =m_interface->findButton( c.point );
 		}
 		catch (...)
 		{
@@ -655,7 +876,7 @@ void CdialogEvent::handleMousePress( const Cpoint &p)
 
 	if ( key==KEY_SPACE && spaceIsLanguage)
 	{
-		m_events.push_back( Cevent( EVENT_LANGUAGE_CHANGE, Cpoint(0,0),false));
+		callback->onEvent(Cevent( EVENT_LANGUAGE_CHANGE, Cpoint(0,0),false));
 		unlock();
 		return;
 	}
@@ -666,11 +887,11 @@ void CdialogEvent::handleMousePress( const Cpoint &p)
 	}
 	if ( !object)
 	{
-		m_mouseStatus =MOUSE_PRESS;
+		m_mouseStat =MOUSE_PRESS;
 		m_mousePress.stop();
 	}
 	// Single button press.
-	m_events.push_back( Cevent( key, KMOD_NONE, false));
+	callback->onEvent(Cevent( key, KMOD_NONE, false));
 	unlock();
 }
 
@@ -684,7 +905,7 @@ void CdialogEvent::handleKeyRelease()
 }
 
 /// @brief New key press.
-void CdialogEvent::handleKeyPress( SDLMod mod, keybutton key)
+void CdialogEvent::handleKeyPress( keymode mod, keybutton key)
 {
 	if ( key==KEY_NONE)
 	{
@@ -718,32 +939,126 @@ void CdialogEvent::handleKeyPress( SDLMod mod, keybutton key)
 /// @brief Check for existing events.
 EpollStatus CdialogEvent::pollEvent( CeventInterface *callback)
 {
+	if ( callback ==NULL)
+	{
+		return POLL_EMPTY;
+	}
+	EpollStatus retVal =POLL_EMPTY;
+	switch (m_mouseStat)
+	{
+	case MOUSE_RELEASED: ///< No activity.
+		break;
+	case MOUSE_START_DRAG: ///< Wait a second before starting to drag.
+		if ( m_mousePress.elapsed()>m_minimumDragTime)
+		{
+			//found =true;
+			m_mouseStat =MOUSE_DRAG;
+			callback->onEvent(Cevent( EVENT_DRAG_START, m_press, false));
+			callback->onEvent(Cevent( EVENT_DRAG_MOVE, m_lastMousePos, false));
+			retVal =POLL_USER;
+			return retVal;
+		}
+		break;
+
+	case MOUSE_START_SCROLL_OR_DRAG: ///< Start a scroll dialog.
+		if ( m_mousePress.elapsed()>m_minimumDragTime)
+		{
+			//found =true;
+			m_mouseStat =MOUSE_SCROLL;
+			if ( m_interface)
+			{
+				m_interface->scrollDialog( m_scrollStart, m_scrollStart-m_lastMousePos);
+			}
+			retVal =POLL_USER;
+		}
+		break;
+	case MOUSE_PAINT:
+		break;
+	case MOUSE_SCROLL: ///< Scrolling window.
+		break;
+	case MOUSE_DRAG: ///< Busy dragging.
+		break;
+	case MOUSE_PRESS: ///< Press mouse without drag, possible repeat.
+		break;
+	case MOUSE_DRAG_DIALOG:	///< Drag entire dialog.
+		break;
+	default:
+		break;
+	}
 	if ( m_events.empty() ==true)
 	{
 		SDL_Event event;
 		if ( Cgraphics::m_defaults.get_test_event &&
 			 Cgraphics::m_defaults.get_test_event( event) ==true)
 		{
-			//Log.enableAll();
-			bool spaceIsLanguage =m_interface ? m_interface->spaceIsLanguage():true;
-			Cevent c( &event, spaceIsLanguage, true);
-			// CdialogEvent::work  test event
+			Cevent c(&event, m_interface ? m_interface->spaceIsLanguage():true, false);
 			m_keyFile.onEvent( &event);
-			unlock();
-			//Ctimestamp::incrementSimulationTime();
-			handleEvent( c);
+			handleEvent(callback, c);
 			return c.status;
 		}
-		return POLL_EMPTY;
-	}
-	if ( callback ==NULL)
-	{
-		return POLL_EMPTY;
+		return retVal;
 	}
 	Cevent event =m_events.front();
+	//Cgraphics::m_defaults.log("poll event %s", event.toString().c_str());
+
 	m_events.pop_front();
-	callback->onEvent( event);
+	m_keyFile.onEvent( event);
+	handleEvent( callback, event);
 	return event.status;
+}
+
+// Now we want to convert an event just before we give it to the dialog.
+void CdialogEvent::handleEvent( CeventInterface *callback, const Cevent &event)
+{
+	switch (event.type)
+	{
+	case EVENT_TOUCH_PRESS:
+		handleMousePress( callback, event );
+		break;
+	case EVENT_TOUCH_RELEASE:
+		handleMouseRelease( callback, event );
+		break;
+	case EVENT_TOUCH_LONG:
+		handleMouseLong( callback, event );
+		break;
+	case EVENT_TOUCH_MOVE:
+	case EVENT_MOUSE_MOVE:
+		handleMouseMove( callback, event );
+		break;
+	case EVENT_DRAG_START:
+	case EVENT_DRAG_MOVE:
+	case EVENT_MAIN_DIALOG:
+	case EVENT_KEY_PRESS: ///< Input/Output event.
+	case EVENT_LANGUAGE_CHANGE:
+		callback->onEvent(event);
+		break;
+
+	default:
+		break;
+//	EVENT_KEY_RELEASE,		///< Input event.
+//	,		///< Input event.
+//	EVENT_PAINT_START,		///< Start painting.
+//	EVENT_DRAG_MOVE,		///< Output event.
+//	EVENT_PAINT_MOVE,		///< Move finger while painting.
+//	EVENT_MOUSE_MOVE,		////< Just move the mouse when pressed.
+//	EVENT_DRAG_STOP,		///< Input event.
+//	EVENT_PAINT_STOP,		///< Stop painting.
+//	EVENT_APPMOUSEFOCUS,	///< Input/Output event.
+//	EVENT_APPMOUSEBLUR, 	///< Input/Output event.
+//	EVENT_APPINPUTFOCUS,	///< Input/Output event.
+//	EVENT_APPINPUTBLUR, 	///< Input/Output event.
+//	EVENT_RESTORE,      	///< Input/Output event.
+//	EVENT_MINIMIZE,     	///< Input/Output event.
+//	EVENT_LANGUAGE_CHANGE,  ///< Output event.
+//	EVENT_MAIN_DIALOG,		///< Output event.
+//	EVENT_BUTTON,			///< Output event.
+//	EVENT_MOUSE_CLICK,		///< Short click for a button.
+//	EVENT_WHEEL_DOWN,		///< Wheel rotate (mouse).
+//	EVENT_WHEEL_UP,			///< Wheel rotate (mouse).
+//	EVENT_QUIT,				///< Quit application.
+//	EVENT_INVALID,
+
+	}
 }
 
 /// For debugging the application.
@@ -759,8 +1074,8 @@ void CdialogEvent::createRandomEvent()
 	case 1:
 		event->type =SDL_KEYDOWN;
 		x=RANDOM(10);
-		xx =RANDOM(SQUARES_WIDTH);
-		yy =RANDOM(SQUARES_HEIGHT);
+		xx =RANDOM(m_squares_width);
+		yy =RANDOM(m_squares_height);
 		k =m_mainGraph->m_touch.getKey( Cpoint( xx,yy));
 		//event->key.keysym.sym =(SDLKey)RANDOM(KEY_MAXIMUM);
 		if (RANDOM(1000)<50)
@@ -785,15 +1100,15 @@ void CdialogEvent::createRandomEvent()
 #if 0
 	case 1: //Mouse move
 		event->type =SDL_MOUSEMOTION;
-		event->motion.x =RANDOM( SQUARES_WIDTH*8);
-		event->motion.y =RANDOM( SQUARES_HEIGHT*8);
+		event->motion.x =RANDOM( m_squares_width*8);
+		event->motion.y =RANDOM( m_squares_height*8);
 		x=RANDOM(10);
 		break;
 
 	case 2: //Mouse release
 		event->type =SDL_MOUSEBUTTONUP;
-		event->motion.x =RANDOM( SQUARES_WIDTH*8);
-		event->motion.y =RANDOM( SQUARES_HEIGHT*8);
+		event->motion.x =RANDOM( m_squares_width*8);
+		event->motion.y =RANDOM( m_squares_height*8);
 		event->button.button =SDL_BUTTON_LEFT;
 		if (RANDOM(100)<25)
 		{
@@ -808,8 +1123,8 @@ void CdialogEvent::createRandomEvent()
 
 	default: //Mouse press
 		event->type =SDL_MOUSEBUTTONDOWN;
-		event->motion.x =RANDOM( SQUARES_WIDTH*8);
-		event->motion.y =RANDOM( SQUARES_HEIGHT*8);
+		event->motion.x =RANDOM( m_squares_width*8);
+		event->motion.y =RANDOM( m_squares_height*8);
 		event->button.button =SDL_BUTTON_LEFT;
 		if (RANDOM(100)<5)
 		{
@@ -831,7 +1146,7 @@ void CdialogEvent::createRandomEvent()
 void CdialogEvent::stopDrag()
 {
 	//m_dragObject =NULL;
-	m_mouseStatus =MOUSE_RELEASED;
+	m_mouseStat =MOUSE_RELEASED;
 }
 
 /** Set new dialog. Unless we're just about to check a dialog.
@@ -846,6 +1161,7 @@ void CdialogEvent::registerActiveDialog( CeventInterface *interface) //{ m_inter
 
 /// @brief Queue for events.
 CeventQueue::CeventQueue()
+: m_size(0)
 {}
 
 /** @brief Destructor */
@@ -859,6 +1175,7 @@ void CeventQueue::push_back( const Cevent &event)
 {
 	m_lock.lock();
 	m_eventList.push( event);
+	m_size++;
 	m_lock.unlock();
 }
 
@@ -878,6 +1195,7 @@ void CeventQueue::pop_front()
 {
 	m_lock.lock();
 	m_eventList.pop();
+	m_size--;
 	m_lock.unlock();
 }
 

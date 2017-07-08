@@ -1,11 +1,43 @@
-/*
- * sdl_rect.h
- *
- *  Created on: 23 dec. 2011
- *      Author: mensfort
+/*============================================================================*/
+/**  @file       sdl_rect.h
+ **  @ingroup    sdl2ui
+ **  @brief		 Rectangle for our system
+ **
+ **  Simple rectangle, simple size and simple implementation of a point
+ **
+ **  @author     mensfort
+ **
+ **  @par Classes:
+ **              Cpoint, Csize, Crect
  */
+/*------------------------------------------------------------------------------
+ ** Copyright (C) 2011, 2014, 2015
+ ** Houkes Horeca Applications
+ **
+ ** This file is part of the SDL2UI Library.  This library is free
+ ** software; you can redistribute it and/or modify it under the
+ ** terms of the GNU General Public License as published by the
+ ** Free Software Foundation; either version 3, or (at your option)
+ ** any later version.
+
+ ** This library is distributed in the hope that it will be useful,
+ ** but WITHOUT ANY WARRANTY; without even the implied warranty of
+ ** MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
+ ** GNU General Public License for more details.
+
+ ** Under Section 7 of GPL version 3, you are granted additional
+ ** permissions described in the GCC Runtime Library Exception, version
+ ** 3.1, as published by the Free Software Foundation.
+
+ ** You should have received a copy of the GNU General Public License and
+ ** a copy of the GCC Runtime Library Exception along with this program;
+ ** see the files COPYING3 and COPYING.RUNTIME respectively.  If not, see
+ ** <http://www.gnu.org/licenses/>
+ **===========================================================================*/
 
 #pragma once
+
+/*------------- Standard includes --------------------------------------------*/
 
 /// Class for point
 class Cpoint
@@ -19,9 +51,9 @@ public:
 	Cpoint div8() const { return Cpoint( (x+4)/8, (y+4)/8); }
 	Cpoint & operator /=(int n);
 	Cpoint & operator -=(const Cpoint &v);
-	int horizontalDistance( const Cpoint &v);
-	int verticalDistance( const Cpoint &v);
-	int distance( const Cpoint b)
+	int horizontalDistance( const Cpoint &v) const;
+	int verticalDistance( const Cpoint &v) const;
+	int distance( const Cpoint b) const
 	{
 		return (b.x-x)*(b.x-x)+(b.y-y)*(b.y-y);
 	}
@@ -103,11 +135,19 @@ public:
 	virtual void setPosition( const Cpoint &point) { m_origin =point; }
 	Csize size() const { return m_size; }
 	operator Csize() { return m_size; }
-	bool inside( const Cpoint &point)
+	bool inside( const Cpoint &point) const
 	{
 		return point.x>=left() && point.x<right() && point.y>=top() && point.y<bottom();
 	}
-	bool collision( const Crect &rect)
+	bool collision( const Crect &rect) const
+	{
+		if ( left()>rect.right() || right()<rect.left() || top()>rect.bottom() || bottom()<rect.top())
+		{
+			return false;
+		}
+		return true;
+	}
+	bool overlap( const Crect &rect) const
 	{
 		if ( left()>=rect.right() || right()<=rect.left() || top()>=rect.bottom() || bottom()<=rect.top())
 		{

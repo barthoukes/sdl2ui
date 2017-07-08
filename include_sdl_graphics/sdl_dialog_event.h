@@ -11,22 +11,39 @@
  **              Cevent
  */
 /*------------------------------------------------------------------------------
- **  Copyright (c) Bart Houkes, 28 jan 2011
- ** 
- **  Copyright notice:
- **  This software is property of Bart Houkes.
- **  Unauthorized duplication and disclosure to third parties is forbidden.
- **============================================================================*/
+ ** Copyright (C) 2011, 2014, 2015
+ ** Houkes Horeca Applications
+ **
+ ** This file is part of the SDL2UI Library.  This library is free
+ ** software; you can redistribute it and/or modify it under the
+ ** terms of the GNU General Public License as published by the
+ ** Free Software Foundation; either version 3, or (at your option)
+ ** any later version.
 
-/*------------- Standard includes --------------------------------------------*/
+ ** This library is distributed in the hope that it will be useful,
+ ** but WITHOUT ANY WARRANTY; without even the implied warranty of
+ ** MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
+ ** GNU General Public License for more details.
+
+ ** Under Section 7 of GPL version 3, you are granted additional
+ ** permissions described in the GCC Runtime Library Exception, version
+ ** 3.1, as published by the Free Software Foundation.
+
+ ** You should have received a copy of the GNU General Public License and
+ ** a copy of the GCC Runtime Library Exception along with this program;
+ ** see the files COPYING3 and COPYING.RUNTIME respectively.  If not, see
+ ** <http://www.gnu.org/licenses/>
+ **===========================================================================*/
 
 #pragma once
 
+/*------------- Standard includes --------------------------------------------*/
 #include <string>
-#include <SDL/SDL.h>
+#include <SDL.h>
 #include <pthread.h>
 #include <queue>
 #include <vector>
+#include <singleton.h>
 
 #include "sdl_font.h"
 //#include "zhongcan_defines.h"
@@ -34,26 +51,22 @@
 #include "my_thread.h"
 #include "timeout.h"
 #include "sdl_key_file.h"
-
-/// @brief Status for message when sent to any client.
-typedef enum
-{
-	DIALOG_EVENT_PROCESSED,		///< Event processed, stop sending.
-	DIALOG_EVENT_OPEN,			///< Event still open.
-	DIALOG_EVENT_GENERAL,		///< Dialog can be sent to all.
-	DIALOG_EVENT_EXIT			///< Dialog request to stop the dialog.
-} Estatus;
+#include "sdl_types.h"
 
 /// @brief Status for the mouse.
 typedef enum
 {
 	MOUSE_RELEASED,				///< No activity.
+	MOUSE_RELEASE_DEBOUNCE,		///< Releasing the mouse.
 	MOUSE_START_DRAG,			///< Wait a second before starting to drag.
+//	MOUSE_START_PAINT,			///< Paint an object.
 	MOUSE_START_SCROLL_OR_DRAG,	///< Start a scroll dialog.
 	MOUSE_SCROLL,				///< Scrolling window.
+	MOUSE_PAINT,				///< Painting with finger on object
 	MOUSE_DRAG,					///< Busy dragging.
+	MOUSE_PRESS_DEBOUNCE,		///< Debounce mouse
 	MOUSE_PRESS,				///< Press mouse without drag, possible repeat.
-	MOUSE_DRAG_DIALOG,			///< Drag entire dialog.
+	MOUSE_DRAG_DIALOG			///< Drag entire dialog.
 } EmouseStatus;
 
 /// @brief Status after polling.
@@ -69,12 +82,16 @@ typedef enum
 	EVENT_TOUCH_PRESS,		///< Output event.
 	EVENT_TOUCH_RELEASE,	///< Output event.
 	EVENT_TOUCH_MOVE,   	///< Output event.
+	EVENT_TOUCH_LONG,		///< Output event.
 	EVENT_KEY_PRESS,		///< Input/Output event.
 	EVENT_KEY_RELEASE,		///< Input event.
 	EVENT_DRAG_START,		///< Input event.
+	EVENT_PAINT_START,		///< Start painting.
 	EVENT_DRAG_MOVE,		///< Output event.
+	EVENT_PAINT_MOVE,		///< Move finger while painting.
 	EVENT_MOUSE_MOVE,		////< Just move the mouse when pressed.
 	EVENT_DRAG_STOP,		///< Input event.
+	EVENT_PAINT_STOP,		///< Stop painting.
 	EVENT_APPMOUSEFOCUS,	///< Input/Output event.
 	EVENT_APPMOUSEBLUR, 	///< Input/Output event.
 	EVENT_APPINPUTFOCUS,	///< Input/Output event.
@@ -105,7 +122,7 @@ public:
 	, which( 0)
 	{
 	}
-	Cevent( keybutton key, SDLMod m, bool testing=false)
+	Cevent( keybutton key, keymode m, bool testing=false)
 	: type( EVENT_KEY_PRESS)
 	, status( testing ? POLL_TESTING:POLL_USER)
 	, point( 0,0)
@@ -131,7 +148,7 @@ public:
 	EpollStatus status;
 	Cpoint		point;
 	keybutton   button;
-	SDLMod      mod;
+	keymode 	mod;
 	int			which;
 };
 
@@ -148,6 +165,7 @@ public:
 	bool empty();
 
 private:
+	int m_size;
 	std::queue<Cevent> m_eventList; ///< All events in queue.
 	CmyLock m_lock; ///< Lock for this queue.
 };
@@ -160,10 +178,10 @@ public:
 	virtual ~CeventInterface() {}
 
 public:
-	virtual Estatus onEvent( Cevent &event) =0;
-	virtual void onStartDrag( CdialogObject * movingObject) =0;
-	virtual void onStopDrag() =0;
-	void addDialog( CeventInterface	*interface);
+	virtual Estatus onEvent( const Cevent &event) =0;
+	virtual void onStartDrag( CdialogObject * movingObject) =0; // reentrant
+	virtual void onStopDrag() =0; // reentrant
+	void addDialog( CeventInterface	*interface); // reentrant
 	void removeDialog( CeventInterface	*interface);
 	void stopDialog( CeventInterface *interface);
 	virtual CdialogObject *findObject( const Cpoint &p) =0;
@@ -189,40 +207,51 @@ public:
 	CdialogEvent();
 	virtual ~CdialogEvent();
 	EpollStatus pollEvent( CeventInterface *callback);
-	void stop() { CmyThread::stop(); }
+	virtual void stop() { CmyThread::stop(); }
 	virtual void work();
 	void stopDrag();
-	Cpoint lastMouse() { return m_lastMouse; }
+	Cpoint lastMouse() { return m_lastMousePos; }
 	bool pressMouse() { return m_isPressed; }
-	EmouseStatus getStatus() { return m_mouseStatus; }
+	EmouseStatus getStatus() { return m_mouseStat; }
 	void startIdiot() { m_idiot =true; }
-	void forceDrag( const Cpoint &dragPoint) { m_dragPoint =dragPoint; m_mouseStatus =MOUSE_DRAG; }
+	void forceDrag( const Cpoint &dragPoint) { m_dragPoint =dragPoint; m_mouseStat =MOUSE_DRAG; }
 	void registerActiveDialog( CeventInterface *interface); //{ m_interface =interface; }
 	CeventInterface *getInterface() { return m_interface; }
+	void handleEvent( CeventInterface *callback, const Cevent &event);
 
 private:
 	void handleEvent( Cevent &event);
 	void createRandomEvent();
 	void flushEvents();
-	void handleKeyPress( SDLMod mod, keybutton key);
+	void handleKeyPress( keymode mod, keybutton key);
 	void handleKeyRelease();
 	void handleMousePress( const Cpoint &p);
 	void handleMouseRelease( const Cpoint &p);
 	void handleMouseMove( const Cpoint &p);
+	void handleMousePress( CeventInterface *callback, const Cevent &c);
+	void handleMouseRelease( CeventInterface *callback, const Cevent &c);
+	void handleMouseLong( CeventInterface *callback, const Cevent &c);
+	void handleMouseMove( CeventInterface *callback, const Cevent &c);
 
 private:
 	CeventInterface		*m_interface;		///< Which interface is active.
-	EmouseStatus  		m_mouseStatus; 		///< Mouse status.
+	EmouseStatus		m_inputStat;		///< Mouse input status.
+	EmouseStatus  		m_mouseStat; 		///< Mouse status.
 	int					m_minimumDragTime; 	///< Minimum time to start drag.
 	int					m_minimumClickTime; ///< Minimum time to send click.
+	int					m_debounceDist;		///< Distance debounce.
+	int					m_debounceTime;		///< Delay for debounce.
 	int					m_numberOfPresses;	///< Number of press for button.
-	Cpoint				m_lastMouse;		///< Last mouse position.
+	Cpoint				m_lastMousePos;		///< Last mouse position.
+	Cpoint				m_inputMousePos; 	///< Input mouse position.
 	int					m_repeatDelay;		///< Delay for repeat.
 	int					m_repeatSpeed;		///< Speed for repeat.
 	CeventQueue			m_events;			///< Events to send.
 	int					m_repeatCount;		///< Time to repeat.
 	Ctimeout 			m_keyPress;			///< Time to repeat.
 	Ctimeout			m_mousePress;		///< Time to press mouse.
+	Ctimeout 			m_mouseDebounce;	///< Time for mouse debounce.
+	Ctimeout 			m_mouseLongDebounce;///< Time for mouse debounce.
 	keybutton			m_repeatButton;		///< Object event may be repeated.
 	Ctimeout			m_repeatTimer; 		///< Timeout until next key press
 	SDL_Event 			m_event;			///< New SDL event coming in...
@@ -233,8 +262,10 @@ private:
 	CkeyFile			m_keyFile;			///< Test class to remember all buttons today.
 	Cpoint				m_press;			///< Where we press the screen.
 	bool				m_isPressed;		///< Is the mouse pressed?
+	bool				m_longDebounced;	///< Long debounce time.
 public:
 	bool				m_idiot;			///< Idiot test.
+	Cpoint				m_debugPosition;	///< Position to debug
 };
 
 

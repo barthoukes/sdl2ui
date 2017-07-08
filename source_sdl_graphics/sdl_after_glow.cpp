@@ -1,6 +1,6 @@
 /*============================================================================*/
 /**  @file      sdl_after_glow.cpp
- **  @ingroup   sdl
+ **  @ingroup   sdl2ui
  **  @brief		Keep a list of buttons that were pressed
  **
  **  Class to define which buttons have an after-glow of buttons pressed.
@@ -8,16 +8,34 @@
  **  @author     mensfort
  **
  **  @par Classes:
- **              CtouchList
+ **              CafterGlowList
  */
 /*------------------------------------------------------------------------------
- **  Copyright (c) Bart Houkes, 29 nov 2014
+ ** Copyright (C) 2011, 2014, 2015
+ ** Houkes Horeca Applications
  **
- **  Copyright notice:
- **  This software is property of Bart Houkes.
- **  Unauthorized duplication and disclosure to third parties is forbidden.
+ ** This file is part of the SDL2UI Library.  This library is free
+ ** software; you can redistribute it and/or modify it under the
+ ** terms of the GNU General Public License as published by the
+ ** Free Software Foundation; either version 3, or (at your option)
+ ** any later version.
+
+ ** This library is distributed in the hope that it will be useful,
+ ** but WITHOUT ANY WARRANTY; without even the implied warranty of
+ ** MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
+ ** GNU General Public License for more details.
+
+ ** Under Section 7 of GPL version 3, you are granted additional
+ ** permissions described in the GCC Runtime Library Exception, version
+ ** 3.1, as published by the Free Software Foundation.
+
+ ** You should have received a copy of the GNU General Public License and
+ ** a copy of the GCC Runtime Library Exception along with this program;
+ ** see the files COPYING3 and COPYING.RUNTIME respectively.  If not, see
+ ** <http://www.gnu.org/licenses/>
  **===========================================================================*/
 
+/*------------- Standard includes --------------------------------------------*/
 #include <sys/time.h>
 #include "sdl_after_glow.h"
 
@@ -27,6 +45,7 @@
 /** @brief Constructor */
 CafterGlowList::CafterGlowList()
 : m_time_now(0)
+, m_last_time(0)
 {
 }
 
@@ -65,48 +84,55 @@ bool CafterGlowList::update( bool pressed, const Cpoint &mouse)
 {
 	bool retVal =false;
 	Cpoint q=mouse/8;
-	(void)elapsed();
 	lock();
-	int n=0;
-	for ( n=0; n<(int)m_info.size();)
+	try
 	{
-		StouchInfo *ti =&m_info[n];
-		if ( ti->pressed)
+		(void)elapsed();
+		int n=0;
+		for ( n=0; n<(int)m_info.size();)
 		{
-			retVal =!ti->last_time;
-			ti->last_time =m_time_now;
-			// Check if the button is released
-			if ( !pressed || !ti->object->m_rect.inside( q))
+			StouchInfo *ti =&m_info[n];
+			if ( ti->pressed)
 			{
-				ti->pressed =false;
-			    ti->startTime =m_time_now;
-			    retVal =true;
-			}
-			else
-			{
-				// Do nothing
-			}
-			n++;
-		}
-		else
-		{
-			// See if we need to remove this from the list
-			if ( m_time_now-ti->startTime>=MAXIMUM_RELEASE_TIME)
-			{
-				m_last_time =m_time_now;
-				m_info.erase( m_info.begin()+n);
-			    retVal =true;
-			}
-			else
-			{
-				if ( m_time_now-ti->last_time>33) // 33 Hz update
+				retVal =!ti->last_time;
+				ti->last_time =m_time_now;
+				// Check if the button is released
+				if ( !pressed || !ti->object->m_rect.inside( q))
 				{
-					m_last_time =m_time_now;
+					ti->pressed =false;
+					ti->startTime =m_time_now;
 					retVal =true;
+				}
+				else
+				{
+					// Do nothing
 				}
 				n++;
 			}
+			else
+			{
+				// See if we need to remove this from the list
+				if ( m_time_now-ti->startTime>=MAXIMUM_RELEASE_TIME)
+				{
+					m_last_time =m_time_now;
+					m_info.erase( m_info.begin()+n);
+					retVal =true;
+				}
+				else
+				{
+					if ( m_time_now-ti->last_time>33) // 33 Hz update
+					{
+						m_last_time =m_time_now;
+						retVal =true;
+					}
+					n++;
+				}
+			}
 		}
+	}
+	catch(...)
+	{
+		retVal =false;
 	}
 	unlock();
 	return retVal;
@@ -120,34 +146,41 @@ bool CafterGlowList::update( bool pressed, const Cpoint &mouse)
 bool CafterGlowList::getFactor( CdialogObject *object, int *factor)
 {
 	*factor=0;
-    bool retVal =false;
+	bool retVal =false;
 	lock();
-	for ( int n=0; n<(int)m_info.size(); n++)
+	try
 	{
-		StouchInfo *ti=&m_info[n];
-		if ( ti->object ==object)
+		for ( int n=0; n<(int)m_info.size(); n++)
 		{
-			retVal =true;
-			if ( ti->pressed)
+			StouchInfo *ti=&m_info[n];
+			if ( ti->object ==object)
 			{
-				*factor =100;
-				ti->last_time =m_last_time;
-			}
-			else
-			{
-				*factor =100-((m_time_now-ti->startTime)*100)/MAXIMUM_RELEASE_TIME;
-				if ( *factor>100)
+				retVal =true;
+				if ( ti->pressed)
 				{
 					*factor =100;
+					ti->last_time =m_last_time;
 				}
-				if ( *factor<0)
+				else
 				{
-					*factor =0;
-					m_info.erase( m_info.begin()+n);
+					*factor =100-((m_time_now-ti->startTime)*100)/MAXIMUM_RELEASE_TIME;
+					if ( *factor>100)
+					{
+						*factor =100;
+					}
+					if ( *factor<0)
+					{
+						*factor =0;
+						m_info.erase( m_info.begin()+n);
+					}
 				}
+				break;
 			}
-			break;
 		}
+	}
+	catch(...)
+	{
+		retVal =false;
 	}
 	unlock();
 	return retVal;

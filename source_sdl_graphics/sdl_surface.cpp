@@ -1,15 +1,45 @@
-/*
- * text_surface.cpp
- *
- *  Created on: 9 apr. 2012
- *      Author: mensfort
+ /*============================================================================*/
+/**  @file       sdl_surface.cpp
+ **  @ingroup    sdl2ui
+ **  @brief		 Create surface for text
+ **
+ **  Align text in many ways inside a rectangle, break into words, add cursor...
+ **
+ **  @author     mensfort
+ **
+ **  @par Classes:
+ **              CtextSurface
  */
+/*------------------------------------------------------------------------------
+ ** Copyright (C) 2011, 2014, 2015
+ ** Houkes Horeca Applications
+ **
+ ** This file is part of the SDL2UI Library.  This library is free
+ ** software; you can redistribute it and/or modify it under the
+ ** terms of the GNU General Public License as published by the
+ ** Free Software Foundation; either version 3, or (at your option)
+ ** any later version.
 
+ ** This library is distributed in the hope that it will be useful,
+ ** but WITHOUT ANY WARRANTY; without even the implied warranty of
+ ** MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
+ ** GNU General Public License for more details.
+
+ ** Under Section 7 of GPL version 3, you are granted additional
+ ** permissions described in the GCC Runtime Library Exception, version
+ ** 3.1, as published by the Free Software Foundation.
+
+ ** You should have received a copy of the GNU General Public License and
+ ** a copy of the GCC Runtime Library Exception along with this program;
+ ** see the files COPYING3 and COPYING.RUNTIME respectively.  If not, see
+ ** <http://www.gnu.org/licenses/>
+ **===========================================================================*/
+
+/*------------- Standard includes --------------------------------------------*/
+#include <assert.h>
 #include "sdl_surface.h"
 #include "sdl_dialog_object.h"
 #include <string>
-#include "log_base.h"
-#include "zhongcan_defines.h"
 
 CmyLock CtextSurface::m_lock;
 #define SWAP(A,B,TYPE) {TYPE temp=A; A=B; B=temp;}
@@ -27,12 +57,12 @@ CmyLock CtextSurface::m_lock;
 /*============================================================================*/
 void CtextSurface::setColour( colour text, colour back)
 {
-	m_textColour.r =((text & 0xFF0000)>>16);
-	m_textColour.g =((text & 0x00FF00)>>8);
-	m_textColour.b =(text & 0x0000FF);
-	m_cursorColour.r =((back & 0xFF0000)>>16);
-	m_cursorColour.g =((back & 0x00FF00)>>8);
-	m_cursorColour.b =(back & 0x0000FF);
+	m_textColour.r =(Uint8)((text & 0xFF0000)>>16);
+	m_textColour.g =(Uint8)((text & 0x00FF00)>>8);
+	m_textColour.b =(Uint8)(text & 0x0000FF);
+	m_cursorColour.r =(Uint8)((back & 0xFF0000)>>16);
+	m_cursorColour.g =(Uint8)((back & 0x00FF00)>>8);
+	m_cursorColour.b =(Uint8)(back & 0x0000FF);
 }
 
 /*==============================================================================
@@ -95,7 +125,7 @@ void CtextSurface::createSurfaces( TTF_Font *font)
 					//bitmap =TTF_RenderUTF8_Blended( font ,fit.c_str(), m_textColour);
 					if ( bitmap ==NULL)
 					{
-						Log.error( "CtextSurface::CtextSurface  Cannot create a surface to paint on!!");
+						// ( "CtextSurface::CtextSurface  Cannot create a surface to paint on!!");
 						// Something wrong in memory, skip the rest.
 						break;
 					}
@@ -145,7 +175,7 @@ void CtextSurface::createSurfaces( TTF_Font *font)
 				//bitmap =TTF_RenderUTF8_Blended( font ,fit.c_str(), m_textColour);
 				if ( bitmap ==NULL)
 				{
-					Log.error( "CtextSurface::CtextSurface  Cannot create a surface to paint on!!");
+					// ( "CtextSurface::CtextSurface  Cannot create a surface to paint on!!");
 					// Something wrong in memory, skip the rest.
 					break;
 				}
@@ -169,8 +199,7 @@ void CtextSurface::createSurfaces( TTF_Font *font)
 			bitmap =blend( fit, m_textColour, font, false);
 			if ( bitmap ==NULL)
 			{
-				Log.error( "CtextSurface::CtextSurface  Cannot create a surface to paint on!!");
-				// Something wrong in memory, skip the rest.
+				// ( "CtextSurface::CtextSurface  Cannot create a surface to paint on!!");
 				break;
 			}
 			m_height +=bitmap->h+m_vertical_spacing;
@@ -254,7 +283,7 @@ SDL_Surface * CtextSurface::blend( utf8string &text, SDL_Color fg, TTF_Font *fon
 	}
 	catch (...)
 	{
-		Log.error("Serious bitmap error!!");
+		// ("Serious bitmap error!!");
 	}
 	m_lock.unlock();
 	return NULL;
@@ -296,7 +325,7 @@ void CtextSurface::createSurface()
 /// @remarks    TYPED
 ///
 /*============================================================================*/
-CtextSurface::CtextSurface( Cgraphics *graphics,
+CtextSurface::CtextSurface( std::shared_ptr<Cgraphics> graphics,
 		                    const std::string &text,
 		                    const Crect &rect,
 		                    int cursor,
@@ -392,7 +421,7 @@ void CtextSurface::renderSurfaces()
 		int hblit =( pixels_left >=s->h) ? s->h:pixels_left;
 		if (hblit >0)
 		{
-			m_graphics->surface( *a, m_rect.left()+x_offset, m_rect.top()+top_offset );
+			m_graphics->renderSurface( *a, m_rect.left()+x_offset, m_rect.top()+top_offset);
 			pixels_left -=hblit;
 			top_offset +=hblit+m_vertical_spacing;
 		}
@@ -419,23 +448,14 @@ void CtextSurface::clean()
 		SDL_FreeSurface( m_surfaces[a]);
 	}
 	m_surfaces.clear();
-	if ( m_owner && m_graphics)
-	{
-		delete m_graphics;
-	}
 }
 
-/*==============================================================================
-**              CtextSurface::CtextSurface
-**============================================================================*/
-///
-/// @brief		Create text surface.
-///
-/// @post       Surface calculated.
-///
-/// @remarks    TYPED
-///
-/*============================================================================*/
+/** @brief		Create text surface.
+ *  @param      text [in] What to write
+ *  @param		font [in] Which font to use
+ *  @param 		size [in] Size of the surface
+ *  @param      gravity [in] What gravity to use
+ */
 CtextSurface::CtextSurface( const std::string &text,
 		                    TTF_Font *font,
 		                    const Csize &size,
@@ -455,10 +475,21 @@ CtextSurface::CtextSurface( const std::string &text,
 	m_textColour.b =8;
 	m_textColour.r =8;
 	m_textColour.g =8;
+#ifndef USE_SDL2
 	m_textColour.unused =128;
+#endif
 	createSurfaces( font);
 	createGraphics();
 	renderSurfaces();
+}
+
+SDL_Surface *CtextSurface::first()
+{
+	if (m_surfaces.size()>0)
+	{
+		return m_surfaces[0];
+	}
+	return NULL;
 }
 
 /** Create a graphic surface, mainly for printing text.
@@ -470,18 +501,19 @@ void CtextSurface::createGraphics()
 	int a;
 	for ( a=0; a<(int)m_surfaces.size(); a++)
 	{
-		hght +=m_surfaces[a]->h;
+		Csize sz(m_surfaces[a]->w, m_surfaces[a]->h);
+		hght +=sz.height();
 		if ( a) hght +=m_vertical_spacing;
-		if ( wdth<m_surfaces[a]->w)
+		if ( wdth<sz.width())
 		{
-			wdth =m_surfaces[a]->w;
+			wdth =sz.width();
 		}
 	}
 	m_graphics =NULL;
 	m_rect =Crect(0,0, wdth, hght);
 	if ( wdth>0 && hght>0)
 	{
-		m_graphics =new Cgraphics( Csize( wdth, hght), false);
+		m_graphics =std::make_shared<Cgraphics>( Csize( wdth, hght), false);
 		m_graphics->init();
 		m_owner =true;
 	}

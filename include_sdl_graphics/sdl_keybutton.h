@@ -1,0 +1,473 @@
+/*============================================================================*/
+/**  @file      sdl_keybutton.h
+ **  @ingroup   source
+ **  @brief		Keyboard class.
+ **
+ **  keyboard.
+ **
+ **  @author     mensfort
+ **
+ **  @par Classes:
+ **              Ckeybutton
+ */
+/*------------------------------------------------------------------------------
+ ** Copyright (C) 2011, 2014, 2015
+ ** Houkes Horeca Applications
+ **
+ ** This file is part of the SDL2UI Library.  This library is free
+ ** software; you can redistribute it and/or modify it under the
+ ** terms of the GNU General Public License as published by the
+ ** Free Software Foundation; either version 3, or (at your option)
+ ** any later version.
+
+ ** This library is distributed in the hope that it will be useful,
+ ** but WITHOUT ANY WARRANTY; without even the implied warranty of
+ ** MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
+ ** GNU General Public License for more details.
+
+ ** Under Section 7 of GPL version 3, you are granted additional
+ ** permissions described in the GCC Runtime Library Exception, version
+ ** 3.1, as published by the Free Software Foundation.
+
+ ** You should have received a copy of the GNU General Public License and
+ ** a copy of the GCC Runtime Library Exception along with this program;
+ ** see the files COPYING3 and COPYING.RUNTIME respectively.  If not, see
+ ** <http://www.gnu.org/licenses/>
+ **===========================================================================*/
+
+#pragma once
+
+/*------------- Standard includes --------------------------------------------*/
+#include <string>
+#ifdef USE_SDL2
+/// Key mode
+#include "SDL_keycode.h"
+typedef SDL_Keymod keymode;
+#define SDL_EVENT_RESERVEDA  (SDL_USEREVENT+0)
+#else
+#include "SDL_keysym.h"
+typedef int keymode;
+#endif
+
+
+/// Key constants.
+typedef enum
+{
+	KEY_BACKSPACE	= (int)SDLK_BACKSPACE,
+	KEY_TAB 		= SDLK_TAB,
+
+	KEY_CR 			= SDLK_RETURN,
+	KEY_CONTROL     = 14,
+	KEY_UNDO        = 18,
+
+	KEY_ESCAPE 		= SDLK_ESCAPE,
+	KEY_STOP		= KEY_ESCAPE,
+	KEY_QUIT 		= KEY_ESCAPE,
+
+	KEY_EXCLAMATION = SDLK_EXCLAIM,
+
+	KEY_HASH        = SDLK_HASH,
+
+	KEY_AMPERSAND   = SDLK_AMPERSAND,
+	KEY_APOSTROPH   = SDLK_QUOTE,
+
+	KEY_0 			= SDLK_0,
+	KEY_1			= SDLK_1,
+	KEY_2			= SDLK_2,
+	KEY_3			= SDLK_3,
+	KEY_4			= SDLK_4,
+	KEY_5			= SDLK_5,
+	KEY_6			= SDLK_6,
+	KEY_7			= SDLK_7,
+	KEY_8			= SDLK_8,
+	KEY_9			= SDLK_9,
+
+	KEY_COLON       = SDLK_COLON,
+	KEY_SEMICOLON   = SDLK_SEMICOLON,
+
+	KEY_SMALLER		= SDLK_LESS,
+	KEY_EQUALS		= SDLK_EQUALS,
+	KEY_BIGGER		= SDLK_GREATER,
+
+	KEY_QUESTION    = SDLK_QUESTION,
+
+	KEY_AT			= SDLK_AT,
+	KEY_A 			= SDLK_a,
+	KEY_B 			= SDLK_b,
+	KEY_C 			= SDLK_c,
+	KEY_D 			= SDLK_d,
+	KEY_E 			= SDLK_e,
+	KEY_F 			= SDLK_f,
+	KEY_G 			= SDLK_g,
+	KEY_H 			= SDLK_h,
+	KEY_I			= SDLK_i,
+	KEY_J			= SDLK_j,
+	KEY_K           = SDLK_k,
+	KEY_L			= SDLK_l,
+	KEY_M 			= SDLK_m,
+	KEY_N           = SDLK_n,
+	KEY_O           = SDLK_o,
+	KEY_P           = SDLK_p,
+	KEY_Q           = SDLK_q,
+	KEY_R           = SDLK_r,
+	KEY_S           = SDLK_s,
+	KEY_T           = SDLK_t,
+	KEY_U           = SDLK_u,
+	KEY_V           = SDLK_v,
+	KEY_W 			= SDLK_w,
+	KEY_X			= SDLK_x,
+	KEY_Y			= SDLK_y,
+	KEY_Z           = SDLK_z,
+
+	KEY_BRACKET_OPEN= SDLK_LEFTBRACKET,
+	KEY_BRACKET_CLOSE= SDLK_RIGHTBRACKET,
+
+	KEY_SHIFT_F1 	= 0xe0, // was b0..bd
+	KEY_SHIFT_F2 	= 0xe1,
+	KEY_SHIFT_F3 	= 0xe2,
+	KEY_SHIFT_F4 	= 0xe3,
+	KEY_SHIFT_F5 	= 0xe4,
+	KEY_SHIFT_F6 	= 0xe5,
+	KEY_SHIFT_F7 	= 0xe6,
+	KEY_SHIFT_F8 	= 0xe7,
+	KEY_SHIFT_F9 	= 0xe8,
+	KEY_SHIFT_F10 	= 0xe9,
+	KEY_SHIFT_F11 	= 0xea,
+	KEY_SHIFT_F12 	= 0xeb,
+
+	KEY_UP 			= SDLK_UP,
+	KEY_DOWN		= SDLK_DOWN,
+
+	KEY_PAGEUP		= SDLK_PAGEUP,
+	KEY_PAGEDOWN 	= SDLK_PAGEDOWN,
+	KEY_F1 			= SDLK_F1,
+	KEY_F2 			= SDLK_F2,
+	KEY_F3 			= SDLK_F3,
+	KEY_F4 			= SDLK_F4,
+	KEY_F5 			= SDLK_F5,
+	KEY_F6 			= SDLK_F6,
+	KEY_F7 			= SDLK_F7,
+	KEY_F8 			= SDLK_F8,
+	KEY_F9 			= SDLK_F9,
+	KEY_F10			= SDLK_F10,
+	KEY_F11 		= SDLK_F11,
+	KEY_F12 		= SDLK_F12,
+	KEY_LEFT_ALT	= SDLK_LALT,
+	KEY_RIGHT_ALT	= SDLK_RALT,
+	KEY_TABLE = KEY_F3,
+	KEY_TOTAL = 11,
+	KEY_EXAMPLE = KEY_F8,
+	KEY_MORE = KEY_F4,
+	KEY_ITEM1 = KEY_F1,
+	KEY_ITEM2 = KEY_F2,
+	KEY_ITEM3 = KEY_F3,
+	KEY_ITEM4 = KEY_F4,
+	KEY_ITEM5 = KEY_F5,
+	KEY_ITEM6 = KEY_F6,
+	KEY_YES = 19,
+	KEY_NO = 20,
+	KEY_CANCEL = KEY_ESCAPE,
+	KEY_TELEPHONE = KEY_F6,
+	KEY_DIRECTION = 23,
+	KEY_NUMBER = '-',
+	KEY_AMOUNT = KEY_F1,
+	KEY_DISCOUNT = '-',
+	KEY_OLD_BILL = KEY_F11,
+	KEY_LAST = KEY_F12,
+	KEY_CORR = KEY_F11,
+	KEY_CHN_BILL = KEY_F7,
+	KEY_BILL = KEY_F12,
+	KEY_BTW = 'B',
+	KEY_DELETE = SDLK_DELETE,
+	KEY_BARCODE = 0xd5,
+	KEY_CALC = KEY_SHIFT_F9,
+	KEY_ALIAS = 29,
+	KEY_TA = 0xd0,
+	KEY_SI = 0xd1,
+	KEY_OK = 0xd2,
+	KEY_LANG = 0x80,
+	KEY_QUANTITY = 0xd4,
+	KEY_PAGEORDER = KEY_F1,
+	KEY_FB = 0xd6,
+	KEY_MERGE = '+',
+	KEY_DOLLAR = SDLK_DOLLAR,
+#ifdef USE_SDL2
+	KEY_EURO = 321,
+#else
+	KEY_EURO = SDLK_EURO,
+#endif
+	KEY_PERCENT = 0x25,
+	KEY_LOAD = KEY_F1,
+	KEY_SAVE = KEY_F2,
+	KEY_FORMAT = KEY_F3,
+	KEY_CHECK = KEY_F4,
+	KEY_COUNT = KEY_F5,
+	KEY_YEAR = KEY_F9,
+	KEY_LEVEL = KEY_F6,
+	KEY_BLOCK = KEY_F7,
+	KEY_ID = KEY_F8,
+	KEY_VALID = KEY_F10,
+	KEY_RESTOID = KEY_F11,
+	KEY_RCTRL =SDLK_RCTRL,
+	KEY_LCTRL =SDLK_LCTRL,
+	KEY_NAME = KEY_F1,
+	KEY_STREET = KEY_F2,
+	KEY_HOUSENR = KEY_F3,
+	KEY_POSTCODE = KEY_F4,
+	KEY_PLACE = KEY_F5,
+	KEY_JANUAR = KEY_F1,
+	KEY_FEBRUAR = KEY_F2,
+	KEY_MARCH = KEY_F3,
+	KEY_APRIL = KEY_F4,
+	KEY_MAY = KEY_F5,
+	KEY_JUNE = KEY_F6,
+	KEY_JULY = KEY_F7,
+	KEY_AUGUST = KEY_F8,
+	KEY_SEPTEMBER = KEY_F9,
+	KEY_OCTOBER = KEY_F10,
+	KEY_NOVEMBER = KEY_F11,
+	KEY_DECEMBER = KEY_F12,
+	KEY_HOURS = '1',
+	KEY_MINUTS = '2',
+	KEY_DAYS = '3',
+	KEY_MONTHS = '4',
+	KEY_YEARS = '5',
+	KEY_TRANSPORT = 0x10,
+	KEY_INIT = 0x11,
+	KEY_REPLACE = 0x12,
+	KEY_EXTRA = 14,
+	KEY_INCLUDED = 19,
+	KEY_INSERT = 0xd7,
+	KEY_SMARTCARD = 0xef,
+	KEY_NOE = '+',
+	KEY_LEFT = SDLK_LEFT,
+	KEY_RIGHT = SDLK_RIGHT,
+	BAR_LEFT = 0xdf,
+	BAR_RIGHT = 0xdc,
+	KEY_LIST = KEY_F7,
+	KEY_NETWORK = 254,
+	KEY_ARROWUP = SDLK_UP,
+	KEY_ARROWDOWN = SDLK_DOWN,
+	KEY_LSHIFT =SDLK_LSHIFT,
+	KEY_RSHIFT =SDLK_RSHIFT,
+	KEY_HOME = SDLK_HOME,
+	KEY_END = SDLK_END,
+	KEY_SPACE =SDLK_SPACE,
+	KEY_TILDE =126,
+	KEY_COMMA =SDLK_COMMA,
+	KEY_STAR = SDLK_ASTERISK,
+	KEY_FORWARDSLASH =SDLK_SLASH,
+	KEY_PLUS = SDLK_PLUS,
+	KEY_MINUS = SDLK_MINUS,
+	KEY_DOT =SDLK_PERIOD,
+	KEY_FORWARD_SLASH = SDLK_SLASH,
+	WT_CANCEL = KEY_ESCAPE,
+	WT_CONFIRM = KEY_CR,
+	WT_NEXT = KEY_DOWN,
+	WT_PREVIOUS = KEY_UP,
+	WT_PRINT = KEY_F9,
+	WT_ELEMENT1 			= SDLK_F1,
+	WT_ELEMENT2 			= KEY_F2,
+	WT_ELEMENT3 			= KEY_F3,
+	WT_ELEMENT4 			= KEY_F4,
+	WT_ELEMENT5 			= KEY_F5,
+	WT_ELEMENT6				= KEY_F6,
+	WT_ELEMENT7 			= KEY_F7,
+	WT_ELEMENT8 			= KEY_F8,
+	MP_NAMES_START =160, // Don't use 101-110 !!
+	MP_NAMES_END =171,
+	KEY_HALF=171,
+	MP_LASTPAGE =208, // Don't use 112-123 !!
+	MP_NEXTPAGE =219,
+	MP_EDIT_NAME =174,
+	MP_LANGUAGE =KEY_F12,
+	MP_PRINTBUTTON =176,
+	MP_CANCEL 				= SDLK_ESCAPE,
+	MP_BAR_ITEM 			= KEY_F3,
+	MP_KITCHEN_ITEM 		= KEY_F4,
+	MP_PRICE_ITEM 			= 177,
+	MP_OK 					= 178,
+	MP_ITEM 				= KEY_F2,
+	MP_USE 					= 179,
+	MP_SAVE 				= KEY_F1,
+	MP_PRINT_ITEMS =KEY_SHIFT_F5,
+	MP_PRINT_CHARS =KEY_SHIFT_F4,
+	MP_PRINT_PAGE =KEY_SHIFT_F3,
+	MP_PRINT_ITEM =KEY_SHIFT_F6,
+	MP_CHANGE_TAX1 =KEY_SHIFT_F9,
+	MP_CHANGE_TAX2 =KEY_SHIFT_F11,
+	MP_CURSOR_LEFT =KEY_LEFT,
+	MP_CURSOR_RIGHT =KEY_RIGHT,
+	MP_DITEM =KEY_F5,
+	MP_ALIAS =KEY_F6,
+	MP_INFO_SCREEN =28,
+	MP_TAXGROUP_SI =KEY_F9,
+	MP_LEVEL =KEY_F7,
+	KEY_NONE =0,
+	MP_TAXGROUP_TA =KEY_F11,
+	MP_SIPRICE =KEY_F8,
+	MP_TAPRICE =KEY_F10,
+	MP_KEY0 =224,
+	MP_KEY9 =233,
+	MP_CURSORLEFT =0xd9,
+	MP_CURSORRIGHT =0xda,
+	KEY_NEXT =SDLK_RIGHT,
+	FIRST_ORDERED_ITEM=KEY_SHIFT_F1,
+#ifdef USE_SDL2
+	KEY_BACK =SDLK_KP_BACKSPACE, //SDLK_BACKSPACE,
+	FIRST_ITEM=512,
+#else
+	KEY_BACK =SDLK_BREAK,
+	FIRST_ITEM=SDLK_LAST,
+#endif
+	KEY_NOCHANGE =FIRST_ITEM+50,
+	KEY_RADICAL1,
+	KEY_RADICAL189=KEY_RADICAL1+188,
+	KEY_FOUND1,
+	KEY_FOUND142  =KEY_FOUND1+141,
+	KEY_CTRL_F1,
+	KEY_CTRL_F2,
+	KEY_CTRL_F3,
+	KEY_CTRL_F4,
+	KEY_CTRL_F5,
+	KEY_CTRL_F6,
+	KEY_CTRL_F7,
+	KEY_CTRL_F8,
+	KEY_CTRL_F9,
+	KEY_CTRL_F10,
+	KEY_CTRL_F11,
+	KEY_CTRL_F12,
+	KEY_CTRL_F13,
+	KEY_CTRL_F14,
+	KEY_CTRL_F15,
+	KEY_CTRL_F16,
+	KEY_GROUP_1,
+	KEY_GROUP_2,
+	KEY_GROUP_3,
+	KEY_GROUP_4,
+	KEY_GROUP_5,
+	KEY_GROUP_6,
+	KEY_GROUP_7,
+	KEY_GROUP_8,
+	KEY_GROUP_9,
+	KEY_GROUP_10,
+	KEY_GROUP_11,
+	KEY_GROUP_12,
+	KEY_GROUP_13,
+	KEY_GROUP_14,
+	KEY_GROUP_15,
+	KEY_GROUP_16,
+	KEY_GROUP_17,
+	KEY_GROUP_18,
+	KEY_GROUP_19,
+	KEY_GROUP_20,
+	KEY_GROUP_21,
+	KEY_GROUP_22,
+	KEY_GROUP_23,
+	KEY_GROUP_24,
+	KEY_GROUP_25,
+	KEY_GROUP_26,
+	KEY_GROUP_27,
+	KEY_GROUP_28,
+	KEY_GROUP_29,
+	KEY_GROUP_30,
+	KEY_GROUP_31,
+	KEY_GROUP_32,
+	KEY_ITEM_1,
+	KEY_ITEM_2,
+	KEY_ITEM_3,
+	KEY_ITEM_4,
+	KEY_ITEM_5,
+	KEY_ITEM_6,
+	KEY_ITEM_7,
+	KEY_ITEM_8,
+	KEY_ITEM_9,
+	KEY_ITEM_10,
+	KEY_ITEM_11,
+	KEY_ITEM_12,
+	KEY_ITEM_13,
+	KEY_ITEM_14,
+	KEY_ITEM_15,
+	KEY_ITEM_16,
+	KEY_ITEM_17,
+	KEY_ITEM_18,
+	KEY_ITEM_19,
+	KEY_ITEM_20,
+	KEY_ITEM_21,
+	KEY_ITEM_22,
+	KEY_ITEM_23,
+	KEY_ITEM_24,
+	KEY_ITEM_25,
+	KEY_ITEM_26,
+	KEY_ITEM_27,
+	KEY_ITEM_28,
+	KEY_ITEM_29,
+	KEY_ITEM_30,
+	KEY_ITEM_31,
+	KEY_ITEM_32,
+	KEY_ITEM_33,
+	KEY_ITEM_34,
+	KEY_ITEM_35,
+	KEY_COLOUR_1,
+	KEY_COLOUR_48=KEY_COLOUR_1+47,
+	KEY_MAP_ITEM1,
+	KEY_MAP_ITEM1000=KEY_MAP_ITEM1+999,
+	KEY_DAY1,
+	KEY_DAY31 =KEY_DAY1+30,
+	KEY_SLIDER,
+	KEY_GRAPH1,
+	KEY_GRAPH80=KEY_GRAPH1+79,
+	KEY_MENU_ITEM1,
+	KEY_MENU_ITEM2,
+	KEY_MENU_ITEM3,
+	KEY_MENU_ITEM4,
+	KEY_MENU_ITEM5,
+	KEY_MENU_ITEM6,
+	KEY_MENU_ITEM7,
+	KEY_MENU_ITEM8,
+	KEY_MENU_ITEM9,
+	KEY_MENU_ITEM10,
+	KEY_MENU_ITEM11,
+	KEY_MENU_ITEM12,
+	KEY_MENU_ITEM13,
+	KEY_MENU_ITEM14,
+	KEY_MENU_ITEM15,
+	KEY_MENU_ITEM16,
+	KEY_MENU_ITEM17,
+	KEY_MENU_ITEM18,
+	KEY_MENU_ITEM19,
+	KEY_MENU_ITEM20,
+	KEY_MENU_ITEM21,
+	KEY_MENU_ITEM22,
+	KEY_MENU_ITEM23,
+	KEY_MENU_ITEM24,
+	KEY_MENU_ITEM25,
+	KEY_MENU_ITEM26,
+	KEY_MENU_ITEM27,
+	KEY_MENU_ITEM28,
+	KEY_MENU_ITEM29,
+	KEY_MENU_ITEM30,
+	KEY_MENU_ITEM2000=KEY_MENU_ITEM1+2000-1,
+	KEY_CLIENT1,
+	KEY_CLIENT20=KEY_CLIENT1+19,
+	KEY_SWYPE_PC1,
+	KEY_SWYPE_PC100 =KEY_SWYPE_PC1+99,
+	KEY_UNDEFINED,
+	KEY_MAXIMUM,
+} keybutton;
+
+/*------------- Standard includes --------------------------------------------*/
+
+class Ckeybutton
+{
+public:
+	Ckeybutton( keybutton n) { m_key =n; }
+	Ckeybutton( const std::string &str);
+	operator std::string();
+	operator keybutton();
+	std::string label();
+private:
+	keybutton m_key;
+
+};
+

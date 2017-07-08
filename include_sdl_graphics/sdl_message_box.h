@@ -11,18 +11,35 @@
  **              CmessageBox
  */
 /*------------------------------------------------------------------------------
- **  Copyright (c) Bart Houkes, 17 jan 2011
+ ** Copyright (C) 2011, 2014, 2015
+ ** Houkes Horeca Applications
  **
- **  Copyright notice:
- **  This software is property of Bart Houkes.
- **  Unauthorized duplication and disclosure to third parties is forbidden.
+ ** This file is part of the SDL2UI Library.  This library is free
+ ** software; you can redistribute it and/or modify it under the
+ ** terms of the GNU General Public License as published by the
+ ** Free Software Foundation; either version 3, or (at your option)
+ ** any later version.
+
+ ** This library is distributed in the hope that it will be useful,
+ ** but WITHOUT ANY WARRANTY; without even the implied warranty of
+ ** MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
+ ** GNU General Public License for more details.
+
+ ** Under Section 7 of GPL version 3, you are granted additional
+ ** permissions described in the GCC Runtime Library Exception, version
+ ** 3.1, as published by the Free Software Foundation.
+
+ ** You should have received a copy of the GNU General Public License and
+ ** a copy of the GCC Runtime Library Exception along with this program;
+ ** see the files COPYING3 and COPYING.RUNTIME respectively.  If not, see
+ ** <http://www.gnu.org/licenses/>
  **===========================================================================*/
 
 #pragma once
 
 /*------------- Standard includes --------------------------------------------*/
 #include <string>
-#include "keybutton.h"
+#include "sdl_keybutton.h"
 #include "sdl_dialog.h"
 #include "timeout.h"
 #include "sdl_button.h"
@@ -34,7 +51,6 @@ typedef enum
   MB_OK=1,
   MB_QUIT=2,
   MB_QUIT_OK=3,
-  MB_WAITER_MANAGER=4,
   MB_STYLE=7,
   MB_RETURN=8,
   MB_TIME1=16,
@@ -62,11 +78,11 @@ class CmessageBox : public Cdialog
 {
 public:
 	CmessageBox( const std::string &name);
-	CmessageBox( const std::string &name, EtextId id);
-	CmessageBox( const std::string &name, const Crect &x, EtextId id, int FLAGS);
+	CmessageBox( const std::string &name, textId id);
+	CmessageBox( const std::string &name, const Crect &x, textId id, int FLAGS);
 	CmessageBox( const std::string &name, const Crect &x, const std::string &Text, int FLAGS);
 	CmessageBox( const std::string &name, int x, int y, int w, int h, const std::string &Text, int FLAGS);
-	CmessageBox( const std::string &name, int x, int y, int w, int h, EtextId id, int FLAGS);
+	CmessageBox( const std::string &name, int x, int y, int w, int h, textId id, int FLAGS);
 	virtual ~CmessageBox();
 
 public:
@@ -76,25 +92,22 @@ public:
 	virtual void onPaint();
 	virtual void onClearScreen();
 	virtual void onCleanup();
-	virtual Estatus onButton( SDLMod mod, keybutton sym);
+	virtual Estatus onButton( keymode mod, keybutton sym);
 	virtual void onExit();
 	virtual bool onLoop();
 	virtual void clear();
-	//virtual Estatus onEvent( Cevent & event);
-	//virtual Estatus onLButtonDown(int mX, int mY);
 	keybutton key();
 	virtual void registerMessageBox();
 	virtual bool isSwypeDialog( const Cpoint &p) { (void)p; return false; }
 	void stop(int exitValue);
 
-public:
+private:
 	Ctimeout m_timer;
  	bool m_push;
 	int  m_flags;
-	std::string m_text;
-	bool m_selfDestruct;
 
 protected:
+	std::string m_text;
 	Cimage  m_ok;
 	Cimage  m_cancel;
 	keybutton m_key;

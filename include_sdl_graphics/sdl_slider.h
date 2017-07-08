@@ -11,20 +11,35 @@
  **              Cslider
  */
 /*------------------------------------------------------------------------------
- **  Copyright (c) Bart Houkes, 24 aug 2011
+ ** Copyright (C) 2011, 2014, 2015
+ ** Houkes Horeca Applications
  **
- **  Copyright notice:
- **  This software is property of Bart Houkes.
- **  Unauthorized duplication and disclosure to third parties is forbidden.
- **============================================================================*/
+ ** This file is part of the SDL2UI Library.  This library is free
+ ** software; you can redistribute it and/or modify it under the
+ ** terms of the GNU General Public License as published by the
+ ** Free Software Foundation; either version 3, or (at your option)
+ ** any later version.
+
+ ** This library is distributed in the hope that it will be useful,
+ ** but WITHOUT ANY WARRANTY; without even the implied warranty of
+ ** MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
+ ** GNU General Public License for more details.
+
+ ** Under Section 7 of GPL version 3, you are granted additional
+ ** permissions described in the GCC Runtime Library Exception, version
+ ** 3.1, as published by the Free Software Foundation.
+
+ ** You should have received a copy of the GNU General Public License and
+ ** a copy of the GCC Runtime Library Exception along with this program;
+ ** see the files COPYING3 and COPYING.RUNTIME respectively.  If not, see
+ ** <http://www.gnu.org/licenses/>
+ **===========================================================================*/
 
 #pragma once
 
 /*------------- Standard includes --------------------------------------------*/
 #include <string>
-#include "zhongcan_defines.h"
 #include "sdl_graphics.h"
-#include "lingual.h"
 #include "sdl_dialog_object.h"
 
 /// @brief  Forward declaration.
@@ -35,7 +50,9 @@ typedef enum
 {
 	SLIDER_HORIZONTAL,
 	SLIDER_VERTICAL,
-	SLIDER_VERTICAL_UPDOWN
+	SLIDER_VERTICAL_UPDOWN,
+	SLIDER_HORIZONTAL_BAR,
+	SLIDER_VERTICAL_BAR
 } EsliderType;
 
 /// @brief  Create and display buttons.
@@ -51,11 +68,13 @@ public:
 	void 	setImage( const std::string &image);
 	void	setColours( colour scrollbar, colour background);
 	void	paintVertical();
+	void    paintHorizontal();
+	void    paintHorizontalBar();
 	bool    setRange( double minimum, double maximum);
 
-	void setValue( double y)
+	virtual void setValue( double y)
 	{
-		m_value =myLimit( y, m_minimum, m_maximum-m_itemsOnScreen);
+		m_value =gLimit( y, m_minimum, m_maximum-m_itemsOnScreen);
 	}
 	double getValue() { return m_value; }
 	int getInt() { return (int)(m_value+0.5); }
@@ -79,13 +98,18 @@ private:
 	colour				m_backgroundColour; ///< Background colour.
 	bool				m_noBackground; ///< No background.
 	bool				m_imageEnable; ///< Image enabled.
+	int					m_image_x; ///< Position slider.
 	int					m_image_y; ///< Position slider.
 	int 				m_unitSize;
 
+protected:
 	double  			m_value; ///< Current y-value.
 	double 				m_minimum; ///< Minimum slider value.
 	double  			m_maximum; ///< Maximum slider value.
+
+private:
 	double  			m_unit; ///< Height of one thing in your list.
+
 	bool				m_offDisabled; ///< temporary disabled until next press.
 	int					m_itemsOnScreen; ///< Items fitting on screen.
 };
