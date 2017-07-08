@@ -1,6 +1,6 @@
 /*============================================================================*/
 /**  @file       sdl_dialog_list.cpp
- **  @ingroup    zhongcan_sdl
+ **  @ingroup    sdl2ui
  **  @brief		 Keep any list of dialogs.
  **
  **  We have 2 standard lists, one for message boxes, another for our world.
@@ -11,24 +11,36 @@
  **              CdialogList
  */
 /*------------------------------------------------------------------------------
- **  Copyright (c) Bart Houkes, 17 nov 2013
+ ** Copyright (C) 2011, 2014, 2015
+ ** Houkes Horeca Applications
  **
- **  Copyright notice:
- **  This software is property of Bart Houkes.
- **  Unauthorized duplication and disclosure to third parties is forbidden.
+ ** This file is part of the SDL2UI Library.  This library is free
+ ** software; you can redistribute it and/or modify it under the
+ ** terms of the GNU General Public License as published by the
+ ** Free Software Foundation; either version 3, or (at your option)
+ ** any later version.
+
+ ** This library is distributed in the hope that it will be useful,
+ ** but WITHOUT ANY WARRANTY; without even the implied warranty of
+ ** MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
+ ** GNU General Public License for more details.
+
+ ** Under Section 7 of GPL version 3, you are granted additional
+ ** permissions described in the GCC Runtime Library Exception, version
+ ** 3.1, as published by the Free Software Foundation.
+
+ ** You should have received a copy of the GNU General Public License and
+ ** a copy of the GCC Runtime Library Exception along with this program;
+ ** see the files COPYING3 and COPYING.RUNTIME respectively.  If not, see
+ ** <http://www.gnu.org/licenses/>
  **===========================================================================*/
 
 /*------------- Standard includes --------------------------------------------*/
 #include "sdl_dialog_list.h"
 #include "sdl_dialog_event.h"
+#include "sdl_dialog.h"
 
 static const bool D=false;
-
-/// Our system, our world.
-CdialogList g_myWorld;
-
-/// Our message boxes.
-CdialogList g_messageBox;
 
 /** @brief Constructor */
 CdialogList::CdialogList()
@@ -46,6 +58,76 @@ CdialogList::~CdialogList()
 void CdialogList::clear()
 {
 	m_dialogs.clear();
+}
+
+/** Paint all dialogs */
+bool CdialogList::onPaint()
+{
+	bool retVal =false;
+	for ( CdialogBase *p : m_dialogs)
+	{
+		Cdialog *d = dynamic_cast<Cdialog*>(p);
+		if (d && d->isInvalidated() && d->m_myGraphics)
+		{
+			d->onPaint();
+			retVal =true;
+		}
+	}
+	return retVal;
+}
+
+/** Paint all dialogs */
+void CdialogList::onRender()
+{
+	for ( CdialogBase *p : m_dialogs)
+	{
+		Cdialog *d = dynamic_cast<Cdialog*>(p);
+		if (d)
+		{
+			if (d->m_myGraphics)
+			{
+				d->onRender();
+			}
+			else
+			{
+				d->invalidate(false);
+				d->onPaint();
+			}
+		}
+	}
+}
+
+dialogBaseIterator CdialogList::begin()
+{
+	return m_dialogs.begin();
+}
+
+dialogBaseIterator CdialogList::end()
+{
+	return m_dialogs.end();
+}
+
+Estatus CdialogList::onButton(keymode mod, keybutton sym)
+{
+	for ( CdialogBase *p : m_dialogs)
+	{
+		Cdialog *d = dynamic_cast<Cdialog*>(p);
+		if (d)
+		{
+			switch( d->onButton( mod, sym) )
+			{
+			case DIALOG_EVENT_EXIT:
+				return DIALOG_EVENT_EXIT;
+			case DIALOG_EVENT_GENERAL:
+				return DIALOG_EVENT_GENERAL;
+			case DIALOG_EVENT_OPEN:
+				continue;
+			case DIALOG_EVENT_PROCESSED:
+				return DIALOG_EVENT_PROCESSED;
+			}
+		}
+	}
+	return DIALOG_EVENT_OPEN;
 }
 
 /** @brief Dialog stops by the user.
@@ -79,21 +161,23 @@ void CdialogList::removeDialog( CdialogBase *interface)
  */
 void CdialogList::addDialog( CdialogBase *interface)
 {
-	lock();
 	// CdialogEvent::newDialog %s", interface->getName().c_str());
-
-	int size =(int)m_dialogs.size();
-	for ( int n=0; n<size;n++)
+	if ( interface )
 	{
-		if ( m_dialogs[n] ==interface)
+		lock();
+		int size =(int)m_dialogs.size();
+		for ( int n=0; n<size;n++)
 		{
-			// CdialogList::addDialog  Dialog already found %d %d!!", n, size);
-			return;
+			if ( m_dialogs[n] ==interface)
+			{
+				// CdialogList::addDialog  Dialog already found %d %d!!", n, size);
+				return;
+			}
 		}
+		m_interface =interface;
+		m_dialogs.push_back( interface);
+		unlock();
 	}
-	m_interface =interface;
-	m_dialogs.push_back( interface);
-	unlock();
 }
 
 /** @brief Calculate last dialog.

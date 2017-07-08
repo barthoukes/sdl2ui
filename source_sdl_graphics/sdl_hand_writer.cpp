@@ -1,6 +1,6 @@
 /*============================================================================*/
 /**  @file       sdl_hand_writer.cpp
- **  @ingroup    zhongcan_sdl
+ **  @ingroup    sdl2ui
  **  @brief		 Create characters by handwriting.
  **
  **  Create a default image.
@@ -11,17 +11,32 @@
  **              ChandWriter
  */
 /*------------------------------------------------------------------------------
- **  Copyright (c) Bart Houkes, 23 sep 2013
+ ** Copyright (C) 2011, 2014, 2015
+ ** Houkes Horeca Applications
  **
- **  Copyright notice:
- **  This software is property of Bart Houkes.
- **  Unauthorized duplication and disclosure to third parties is forbidden.
- **============================================================================*/
+ ** This file is part of the SDL2UI Library.  This library is free
+ ** software; you can redistribute it and/or modify it under the
+ ** terms of the GNU General Public License as published by the
+ ** Free Software Foundation; either version 3, or (at your option)
+ ** any later version.
+
+ ** This library is distributed in the hope that it will be useful,
+ ** but WITHOUT ANY WARRANTY; without even the implied warranty of
+ ** MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
+ ** GNU General Public License for more details.
+
+ ** Under Section 7 of GPL version 3, you are granted additional
+ ** permissions described in the GCC Runtime Library Exception, version
+ ** 3.1, as published by the Free Software Foundation.
+
+ ** You should have received a copy of the GNU General Public License and
+ ** a copy of the GCC Runtime Library Exception along with this program;
+ ** see the files COPYING3 and COPYING.RUNTIME respectively.  If not, see
+ ** <http://www.gnu.org/licenses/>
+ **===========================================================================*/
 
 /*------------- Standard includes --------------------------------------------*/
-
-#define USE_ZINNIA
-
+#include <assert.h>
 #include "sdl_hand_writer.h"
 #include "sdl_surface.h"
 #include "sdl_dialog_event.h"
@@ -36,7 +51,7 @@
 /// @param height [in] Position.
 ///
 /*============================================================================*/
-ChandWriter::ChandWriter( Cdialog *parent, const Crect &rect)
+ChandWriter::ChandWriter( Cdialog *parent, const Crect &rect, const std::string &model, int distance)
 : Cimage( parent, rect, KEY_NONE, "", BORDER_NONE, 0, "")
 , m_stroke(0)
 , m_distance(1000)
@@ -45,12 +60,14 @@ ChandWriter::ChandWriter( Cdialog *parent, const Crect &rect)
 , m_recognizer( NULL)
 , m_character( NULL)
 , m_result( NULL)
+, m_minimum_distance(distance)
 {
-	int options =SDL_SWSURFACE; //|SDL_NOFRAME;
+	//int options =SDL_SWSURFACE; //|SDL_NOFRAME;
 	//options =SDL_SWSURFACE|SDL_NOFRAME;
-    Uint32 rmask, gmask, bmask, amask;
+    //Uint32 rmask, gmask, bmask, amask;
 
-    m_backgroundColour =Cgraphics::m_defaults.handwriting_background;
+    //m_backgroundColour =Cgraphics::m_defaults.handwriting_background;
+    m_background.setColours( Cgraphics::m_defaults.handwriting_background, Cgraphics::m_defaults.handwriting_background);
     /* SDL interprets each pixel as a 32-bit number, so our masks must depend
        on the endianness (byte order) of the machine */
 	#if 0 //SDL_BYTEORDER ==SDL_BIG_ENDIAN
@@ -59,21 +76,29 @@ ChandWriter::ChandWriter( Cdialog *parent, const Crect &rect)
 		bmask = 0x0000ff00;
 		amask = 0x000000ff;
 	#else
-		bmask = 0x000000ff;
-		gmask = 0x0000ff00;
-		rmask = 0x00ff0000;
-		amask = 0; //0xff000000;
+		//bmask = 0x000000ff;
+		//gmask = 0x0000ff00;
+		//rmask = 0x00ff0000;
+		//amask = 0; //0xff000000;
 	#endif
 
 	if ( Cgraphics::m_defaults.handwriting_detection_enabled)
 	{
+#ifdef USE_SDL2
+		assert(0);
+		//m_surface =SDL_CreateTexture( m_graphics->m_renderer,
+		//		                      SDL_PIXELFORMAT_ARGB8888,
+		//							  SDL_TEXTUREACCESS_TARGET,
+		//							  m_rect.width()*8, m_rect.height()*8);
+#else
 		m_surface =SDL_CreateRGBSurface( options, m_rect.width()*8, m_rect.height()*8,
 										 ::m_mainGraph->bitsPerPixel(),
 										 rmask, gmask, bmask, amask);
+#endif
 #ifdef USE_ZINNIA
 		m_recognizer = zinnia_recognizer_new();
 
-		if (!zinnia_recognizer_open( m_recognizer, "/home/mensfort/zhongcan/font/handwriting-zh_CN.model"))
+		if (!zinnia_recognizer_open( m_recognizer, model.c_str()))
 		{
 		    //"ChandWriter::ChandWriter  ERROR: %s\n", zinnia_recognizer_strerror( m_recognizer));
 			return;
@@ -86,7 +111,7 @@ ChandWriter::ChandWriter( Cdialog *parent, const Crect &rect)
 	 //zinnia_character_set_width( m_character, m_rect.width());
 	 //zinnia_character_set_height( m_character, m_rect.height());
 	 clearImage();
-	 enableDrag();
+	 enablePainting(); //enableDrag();
 }
 
 /** @brief  Clear the handwriter background. */
@@ -94,12 +119,16 @@ void ChandWriter::clearImage()
 {
 	if ( Cgraphics::m_defaults.handwriting_detection_enabled)
 	{
+#ifdef USE_SDL2
+		assert(0);
+#else
 		SDL_Rect rect;
-		rect.h =m_surface->h;
-		rect.w =m_surface->w;
+		rect.h =(Uint16)m_surface->h;
+		rect.w =(Uint16)m_surface->w;
 		rect.x =0;
 		rect.y =0;
-		SDL_FillRect( m_surface, &rect, m_backgroundColour);
+		SDL_FillRect( m_surface, &rect, m_background.getColour());
+#endif
 		m_stroke =0;
 		m_index =0;
 		m_lastPoint =Cpoint(-5,-100);
@@ -135,10 +164,9 @@ ChandWriter::~ChandWriter()
  *  @param p [in] New location of our finger.
  *  @return true on success.
  */
-bool ChandWriter::onDrag( Cpoint p)
+bool ChandWriter::onPaintingMove( const Cpoint &point)
 {
-	p =CdialogEvent::Instance()->lastMouse();
-	p =p-(m_rect.leftTop()*8);
+	Cpoint p =point-(m_rect.leftTop()*8);
 	if ( m_surface ==NULL)
 	{
 		return false;
@@ -147,23 +175,50 @@ bool ChandWriter::onDrag( Cpoint p)
 	{
 		m_started =true;
 		addPoint( p.x, p.y);
-		//zinnia_character_add( m_character, m_stroke, p.x, p.y);
+#ifdef USE_SDL2
+		m_graphics->setRenderArea( m_surface);
+		m_graphics->pixel( p.x, p.y);
+		m_graphics->setRenderArea( NULL);
+#else
 		CtextSurface::pixel( m_surface, p);
+#endif
 		m_lastPoint =p;
 		m_index =1;
 	}
 	else
 	{
 		// Not for small distances.
-		if ( p.distance( m_lastPoint) >50 && p.distance( m_lastPoint)<50*50 && ++m_index<1000)
+		if ( p.distance( m_lastPoint) >m_minimum_distance && ++m_index<1000)
 		{
 			// New line detected.
 			addPoint( p.x, p.y);
+#ifdef USE_SDL2
+			m_graphics->setRenderArea( m_surface);
+			m_graphics->line( m_lastPoint.x, m_lastPoint.y, p.x, p.y);
+			m_graphics->setRenderArea( NULL);
+#else
 			CtextSurface::line( m_surface, m_lastPoint, p);
+#endif
 			// pixel(%d,%d) to (%d,%d)", m_lastPoint.x, m_lastPoint.y, p.x, p.y);
 			m_lastPoint =p;
 		}
 	}
+	Cimage::onPaint(0);
+	onUpdate();
+	return true;
+}
+
+/** @brief Start with next stroke */
+bool ChandWriter::onPaintingStart( const Cpoint &p)
+{
+	m_started =false;
+	if ( m_result)
+	{
+		zinnia_result_destroy( m_result);
+		m_result =NULL;
+	}
+	//m_started =false;
+	onPaintingMove( p);
 	return true;
 }
 
@@ -171,17 +226,23 @@ bool ChandWriter::onDrag( Cpoint p)
  *  @param p [in] Point where we release the finger.
  *  @return true when correct.
  */
-bool ChandWriter::onDragEnd( Cpoint p)
+bool ChandWriter::onPaintingStop( const Cpoint &point)
 {
 	if ( m_surface ==NULL)
 	{
 		return false;
 	}
-	p =CdialogEvent::Instance()->lastMouse();
-	p =p-(m_rect.leftTop()*8);
+	//p =CdialogEvent::Instance()->lastMouse();
+	Cpoint p =point-(m_rect.leftTop()*8);
 	addPoint( p.x, p.y);
 	//zinnia_character_add( m_character, m_stroke, p.x, p.y);
+#ifdef USE_SDL2
+	m_graphics->setRenderArea( m_surface);
+	m_graphics->line( m_lastPoint.x, m_lastPoint.y, p.x, p.y);
+	m_graphics->setRenderArea( NULL);
+#else
 	CtextSurface::line( m_surface, m_lastPoint, p);
+#endif
 	m_started =false;
 	m_stroke++;
 	m_lastPoint =Cpoint(-100,-100);
@@ -193,10 +254,10 @@ bool ChandWriter::onDragEnd( Cpoint p)
 			zinnia_result_destroy( m_result);
 			m_result =NULL;
 		}
-		m_result = zinnia_recognizer_classify( m_recognizer, m_character, 14);
+		m_result = zinnia_recognizer_classify( m_recognizer, m_character, 50);
 	}
 #endif
-	return false;
+	return true;
 }
 
 /** @brief Add a point to the symbol line.

@@ -1,10 +1,41 @@
-/*
- * text_font.cpp
- *
- *  Created on: 9 apr. 2012
- *      Author: mensfort
+/*============================================================================*/
+/**  @file       sdl_font.cpp
+ **  @ingroup    sdl2ui
+ **  @brief		 Default dialog.
+ **
+ **  Use fonts for our program
+ **
+ **  @author     mensfort
+ **
+ **  @par Classes:
+ **              CtextFont
  */
+/*------------------------------------------------------------------------------
+ ** Copyright (C) 2011, 2014, 2015
+ ** Houkes Horeca Applications
+ **
+ ** This file is part of the SDL2UI Library.  This library is free
+ ** software; you can redistribute it and/or modify it under the
+ ** terms of the GNU General Public License as published by the
+ ** Free Software Foundation; either version 3, or (at your option)
+ ** any later version.
 
+ ** This library is distributed in the hope that it will be useful,
+ ** but WITHOUT ANY WARRANTY; without even the implied warranty of
+ ** MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
+ ** GNU General Public License for more details.
+
+ ** Under Section 7 of GPL version 3, you are granted additional
+ ** permissions described in the GCC Runtime Library Exception, version
+ ** 3.1, as published by the Free Software Foundation.
+
+ ** You should have received a copy of the GNU General Public License and
+ ** a copy of the GCC Runtime Library Exception along with this program;
+ ** see the files COPYING3 and COPYING.RUNTIME respectively.  If not, see
+ ** <http://www.gnu.org/licenses/>
+ **===========================================================================*/
+
+/*------------- Standard includes --------------------------------------------*/
 #include "sdl_font.h"
 #include "sdl_graphics.h"
 
@@ -24,13 +55,12 @@ SsingleFont CtextFont::findFont( const std::string &fontName, int pixels)
 			return m_fonts[a];
 		}
 	}
-	//Log.write( "CtextFont::findFont  %s %d", fontName.c_str(), pixels);
 	std::string s=Cgraphics::m_defaults.font_path + fontName;
     if (!TTF_WasInit()) TTF_Init(); // Initilize SDL_ttf
 	TTF_Font *font =TTF_OpenFont( s.c_str(), pixels);
 	if (!font)
 	{
-		// Cannot find font: %s %d !!", s.c_str(), pixels);
+		const char *err = TTF_GetError();
         return emptyFont;
 	}
 	SsingleFont sf;
@@ -66,16 +96,16 @@ TTF_Font *CtextFont::font()
 	return m_font.local.font;
 }
 
-CtextFont::CtextFont( const char *fname)
+CtextFont::CtextFont( const char *fname, bool relative_to_screen)
 {
 	std::string name(fname);
 	std::string chineseFontName;
 	std::string localFontName;
-	int chinesePixels;
-	int localPixels;
+	int chinesePixels =0;
+	int localPixels =0;
 	if ( Cgraphics::m_defaults.get_font)
 	{
-		Cgraphics::m_defaults.get_font( name, localFontName, chineseFontName, localPixels, chinesePixels);
+		Cgraphics::m_defaults.get_font( name, localFontName, chineseFontName, localPixels, chinesePixels, relative_to_screen);
 	}
 	if ( chineseFontName =="")
 	{

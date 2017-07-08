@@ -1,12 +1,43 @@
-/*
- * text_surface.h
- *
- *  Created on: 9 apr. 2012
- *      Author: mensfort
+ /*============================================================================*/
+/**  @file       sdl_surface.h
+ **  @ingroup    sdl2ui
+ **  @brief		 Create surface for text
+ **
+ **  Align text in many ways inside a rectangle, break into words, add cursor...
+ **
+ **  @author     mensfort
+ **
+ **  @par Classes:
+ **              CtextSurface
  */
+/*------------------------------------------------------------------------------
+ ** Copyright (C) 2011, 2014, 2015
+ ** Houkes Horeca Applications
+ **
+ ** This file is part of the SDL2UI Library.  This library is free
+ ** software; you can redistribute it and/or modify it under the
+ ** terms of the GNU General Public License as published by the
+ ** Free Software Foundation; either version 3, or (at your option)
+ ** any later version.
+
+ ** This library is distributed in the hope that it will be useful,
+ ** but WITHOUT ANY WARRANTY; without even the implied warranty of
+ ** MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
+ ** GNU General Public License for more details.
+
+ ** Under Section 7 of GPL version 3, you are granted additional
+ ** permissions described in the GCC Runtime Library Exception, version
+ ** 3.1, as published by the Free Software Foundation.
+
+ ** You should have received a copy of the GNU General Public License and
+ ** a copy of the GCC Runtime Library Exception along with this program;
+ ** see the files COPYING3 and COPYING.RUNTIME respectively.  If not, see
+ ** <http://www.gnu.org/licenses/>
+ **===========================================================================*/
 
 #pragma once
 
+/*------------- Standard includes --------------------------------------------*/
 #include "sdl_rect.h"
 #include "sdl_graphics.h"
 #include "sdl_dialog_object.h"
@@ -22,7 +53,7 @@ class CtextSurface
 {
 public:
 	// For screen
-	CtextSurface( Cgraphics *graphics,
+	CtextSurface( std::shared_ptr<Cgraphics>,
 			      const std::string &text,
 			      const Crect &rect,
 			      int cursor,
@@ -39,7 +70,7 @@ public:
 
 	virtual ~CtextSurface();
 	int width() { return m_graphics ? m_graphics->width():0; }
-	Cgraphics *graphics() { return m_graphics; }
+	std::shared_ptr<Cgraphics> graphics() { return m_graphics; }
 	static void line( SDL_Surface *surface, const Cpoint &from, const Cpoint &to);
 	static void pixel( SDL_Surface *surface, const Cpoint &pixel);
 
@@ -54,6 +85,8 @@ private:
 	// For printer.
 	void calculateSize( TTF_Font *font);
 	void createGraphics();
+public:
+	SDL_Surface *first();
 
 private:
 	SDL_Colour   m_textColour; ///< Font color (R,G,B)
@@ -64,7 +97,7 @@ private:
 	CtextSplitter    m_split; ///< Text split into lines.
 	Crect		 m_rect; ///< Size of graphic.
 	int			 m_vertical_spacing; ///< Spacing vertical.
-	Cgraphics	 *m_graphics;
+	std::shared_ptr<Cgraphics> m_graphics; ///< Graphics with reference count
 	int			 m_index;
 	int 		 m_cursor;
 	bool		 m_owner; ///< Should I remove the graphics in the end?

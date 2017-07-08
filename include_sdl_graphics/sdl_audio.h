@@ -22,8 +22,8 @@
 #define AUDIO_H_
 
 #include <string>
-#include "SDL/SDL.h"
-#include "SDL/SDL_mixer.h"
+#include "SDL.h"
+#include "SDL_mixer.h"
 #include "singleton.h"
 
 class Caudio : public Tsingleton<Caudio>
@@ -33,7 +33,7 @@ friend class Tsingleton<Caudio>;
 public:
 	Caudio();
 	virtual ~Caudio();
-	void play( const char *wavFile);
+	void play( const std::string &wavFile);
 	void click() { if ( m_click.size()) play( m_click.c_str()); }
 	void setClick( const std::string &click) { m_click=click; }
 	void setAudioPath( const std::string &path) { m_path=path; }

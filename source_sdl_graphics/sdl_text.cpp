@@ -1,15 +1,56 @@
-/*
- * sdl_text.cpp
- *
- *  Created on: 23 dec. 2011
- *      Author: mensfort
+/*============================================================================*/
+/**  @file       sdl_text.cpp
+ **  @ingroup    sdl2ui
+ **  @brief		 Text to display
+ **
+ **  Create a text object, with font, background, multi-language etc.
+ **
+ **  @author     mensfort
+ **
+ **  @par Classes:
+ **              Ctext
  */
+/*------------------------------------------------------------------------------
+ ** Copyright (C) 2011, 2014, 2015
+ ** Houkes Horeca Applications
+ **
+ ** This file is part of the SDL2UI Library.  This library is free
+ ** software; you can redistribute it and/or modify it under the
+ ** terms of the GNU General Public License as published by the
+ ** Free Software Foundation; either version 3, or (at your option)
+ ** any later version.
 
+ ** This library is distributed in the hope that it will be useful,
+ ** but WITHOUT ANY WARRANTY; without even the implied warranty of
+ ** MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
+ ** GNU General Public License for more details.
+
+ ** Under Section 7 of GPL version 3, you are granted additional
+ ** permissions described in the GCC Runtime Library Exception, version
+ ** 3.1, as published by the Free Software Foundation.
+
+ ** You should have received a copy of the GNU General Public License and
+ ** a copy of the GCC Runtime Library Exception along with this program;
+ ** see the files COPYING3 and COPYING.RUNTIME respectively.  If not, see
+ ** <http://www.gnu.org/licenses/>
+ **===========================================================================*/
+
+/*------------- Standard includes --------------------------------------------*/
 #include "sdl_text.h"
 #include "sdl_dialog.h"
 #include "sdl_surface.h"
-#include "graphics_widgets.h"
 
+/** @brief Constructor
+ *  @param parent [in] Parent dialog
+ *  @param rect [in] Position text
+ *  @param code [in] What key code
+ *  @param font [in] What font and size
+ *  @param value [in] String to display
+ *  @param text [in] What colour to display
+ *  @param align [in] Alignment on screen
+ *  @param cursor [in] To display any cursor (or -1)
+ *  @param background [in] Background colour for cursor
+ */
 Ctext::Ctext( Cdialog *parent,
 		      const Crect &rect,
 		      keybutton code,
@@ -21,7 +62,7 @@ Ctext::Ctext( Cdialog *parent,
 		      int background)
 : CdialogObject( parent, rect, code)
 , m_value( value)
-, m_textId( _NO_TEXT)
+, m_textId( INVALID_TEXT_ID)
 , m_useTextId( false)
 , m_gravity( align)
 , m_colour( text)
@@ -36,11 +77,20 @@ Ctext::Ctext( Cdialog *parent,
 {
 }
 
+/** @brief Constructor
+ *  @param parent [in] Parent dialog
+ *  @param rect [in] Position text
+ *  @param code [in] What key code
+ *  @param font [in] What font and size
+ *  @param value [in] String to display
+ *  @param text [in] What colour to display
+ *  @param align [in] Alignment on screen
+ */
 Ctext::Ctext( Cdialog *parent,
 		      const Crect &rect,
 		      keybutton code,
 		      const Sfont &font,
-		      const EtextId value,
+		      const textId value,
 		      colour text,
 		      Egravity align)
 : CdialogObject( parent, rect, code)
@@ -60,9 +110,9 @@ Ctext::Ctext( Cdialog *parent,
 {
 }
 
+/** @brief Destructor */
 Ctext::~Ctext()
 {
-	// TODO Auto-generated destructor stub
 }
 
 /*============================================================================*/
@@ -77,7 +127,7 @@ void Ctext::onPaint( int touch)
 	std::string text;
 	if ( m_useTextId)
 	{
-		text =Lin[ m_textId][ Cdialog::language()];
+		text =Cgraphics::m_defaults.get_translation( m_textId, Cgraphics::m_defaults.country);
 		onPaint( text, touch);
 	}
 	else
@@ -95,12 +145,13 @@ void Ctext::onPaint( int touch)
 /*============================================================================*/
 void Ctext::onPaint( const std::string &text, int touch)
 {
+	(void)touch;
 	utf8string zs(text); // Conversion old format.
 	std::string t(zs);
 	TTF_Font *f=m_font.local.font;
 	for ( int a=0; a<(int)zs.size(); a++)
 	{
-		if ( zs[a]>255)
+		if ( zs[a]>16384) // && zs[a]!=0x20ac)
 		{
 			f=m_font.chinese.font;
 			break;
@@ -130,7 +181,7 @@ void Ctext::onPaint( const std::string &text, int touch)
 /// @param textId [in] Which Text ID to display.
 ///
 /*============================================================================*/
-void Ctext::setTextId( EtextId textId)
+void Ctext::setTextId( textId textId)
 {
 	m_textId =textId;
 	m_value ="";
@@ -158,7 +209,7 @@ void Ctext::setColour( colour text)
 /*============================================================================*/
 void Ctext::setText( const std::string &textId)
 {
-	m_textId =_NO_TEXT;
+	m_textId =INVALID_TEXT_ID;
 	m_value =textId;
 	m_useTextId =false;
 }
@@ -172,6 +223,6 @@ void Ctext::setText( const std::string &textId)
 /*============================================================================*/
 bool Ctext::empty()
 {
-	if ( m_useTextId) { return (m_textId ==_NO_TEXT); }
+	if ( m_useTextId) { return (m_textId ==INVALID_TEXT_ID); }
 	return m_value.empty();
 }

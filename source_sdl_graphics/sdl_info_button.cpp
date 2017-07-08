@@ -3,23 +3,39 @@
  **  @ingroup    zhongcan_sdl
  **  @brief		 Default button implementation.
  **
- **  Create a default button. This is a basic template for all buttons.
+ **  Create an information button. This is a button with text in front
  **
  **  @author     mensfort
  **
  **  @par Classes:
- **              Cbutton
+ **              CinfoButton
  */
 /*------------------------------------------------------------------------------
- **  Copyright (c) Bart Houkes, 28 jan 2011
+ ** Copyright (C) 2011, 2014, 2015
+ ** Houkes Horeca Applications
  **
- **  Copyright notice:
- **  This software is property of Bart Houkes.
- **  Unauthorized duplication and disclosure to third parties is forbidden.
- **============================================================================*/
+ ** This file is part of the SDL2UI Library.  This library is free
+ ** software; you can redistribute it and/or modify it under the
+ ** terms of the GNU General Public License as published by the
+ ** Free Software Foundation; either version 3, or (at your option)
+ ** any later version.
+
+ ** This library is distributed in the hope that it will be useful,
+ ** but WITHOUT ANY WARRANTY; without even the implied warranty of
+ ** MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
+ ** GNU General Public License for more details.
+
+ ** Under Section 7 of GPL version 3, you are granted additional
+ ** permissions described in the GCC Runtime Library Exception, version
+ ** 3.1, as published by the Free Software Foundation.
+
+ ** You should have received a copy of the GNU General Public License and
+ ** a copy of the GCC Runtime Library Exception along with this program;
+ ** see the files COPYING3 and COPYING.RUNTIME respectively.  If not, see
+ ** <http://www.gnu.org/licenses/>
+ **===========================================================================*/
 
 /*------------- Standard includes --------------------------------------------*/
-
 #include "sdl_info_button.h"
 
 /*============================================================================*/
@@ -40,7 +56,7 @@ CinfoButton::CinfoButton( Cdialog *parent,
 			     const std::string &defaultText)
 : CdialogObject( parent, rect, code),
   m_title( parent,
-		   Crect( rect.left(), rect.top(), 10, rect.height()),
+		   Crect( rect.left(), rect.top(), Cgraphics::m_defaults.width/8/10, rect.height()),
 		   code,
 		   (Sfont)CtextFont("info_button"),
 		   id,
@@ -49,7 +65,7 @@ CinfoButton::CinfoButton( Cdialog *parent,
 		   0,
 		   FILL_GRADIENT),
   m_data( parent,
-		  Crect( rect.left()+10, rect.top(), rect.width()-10, rect.height()),
+		  Crect( rect.left()+m_title.width(), rect.top(), rect.width()-m_title.width(), rect.height()),
 		  code,
 		  defaultText)
 {

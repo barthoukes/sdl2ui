@@ -3,7 +3,7 @@
  **  @ingroup    zhongcan_sdl
  **  @brief		 Default dialog.
  **
- **  Create a scrollbar. This is a dialog object.
+ **  Create a slider for touchscreens. This is a dialog object.
  **
  **  @author     mensfort
  **
@@ -11,23 +11,34 @@
  **              Cslider
  */
 /*------------------------------------------------------------------------------
- **  Copyright (c) Bart Houkes, 28 jan 2011
+ ** Copyright (C) 2011, 2014, 2015
+ ** Houkes Horeca Applications
  **
- **  Copyright notice:
- **  This software is property of Bart Houkes.
- **  Unauthorized duplication and disclosure to third parties is forbidden.
- **============================================================================*/
+ ** This file is part of the SDL2UI Library.  This library is free
+ ** software; you can redistribute it and/or modify it under the
+ ** terms of the GNU General Public License as published by the
+ ** Free Software Foundation; either version 3, or (at your option)
+ ** any later version.
+
+ ** This library is distributed in the hope that it will be useful,
+ ** but WITHOUT ANY WARRANTY; without even the implied warranty of
+ ** MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
+ ** GNU General Public License for more details.
+
+ ** Under Section 7 of GPL version 3, you are granted additional
+ ** permissions described in the GCC Runtime Library Exception, version
+ ** 3.1, as published by the Free Software Foundation.
+
+ ** You should have received a copy of the GNU General Public License and
+ ** a copy of the GCC Runtime Library Exception along with this program;
+ ** see the files COPYING3 and COPYING.RUNTIME respectively.  If not, see
+ ** <http://www.gnu.org/licenses/>
+ **===========================================================================*/
 
 /*------------- Standard includes --------------------------------------------*/
-
 #include "sdl_button.h"
-#include "log_base.h"
 #include "sdl_slider.h"
 #include "sdl_image.h"
-#include "zhongcan_conf.h"
-#include "graphics_widgets.h"
-#include "global.h"
-#include "zhongcan_icon.h"
 
 #define TOUCH_SLIDER
 
@@ -44,10 +55,11 @@
 Cslider::Cslider( const Crect &rect, int unitSize, keybutton code, EsliderType type)
 : CdialogObject( NULL, rect, code)
 , m_sliderType( type)
-, m_scrollbarColour( COLOUR("COLOUR_BUTTON_TEXT"))
-, m_backgroundColour( COLOUR("COLOUR_BUTTON_BACKGROUND2"))
+, m_scrollbarColour( Cgraphics::m_defaults.button_text)
+, m_backgroundColour( Cgraphics::m_defaults.button_background2)
 , m_noBackground(true)
 , m_imageEnable(false)
+, m_image_x(0)
 , m_image_y(0)
 , m_unitSize( unitSize)
 , m_value(-1000)
@@ -66,7 +78,6 @@ Cslider::Cslider( const Crect &rect, int unitSize, keybutton code, EsliderType t
 /*============================================================================*/
 Cslider::~Cslider()
 {
-	// TODO Auto-generated destructor stub
 }
 
 /*============================================================================*/
@@ -88,6 +99,11 @@ void Cslider::onPaint( int touch)
 	switch (m_sliderType)
 	{
 	case SLIDER_HORIZONTAL:
+		paintHorizontal();
+		break;
+
+	case SLIDER_HORIZONTAL_BAR:
+		paintHorizontalBar();
 		break;
 
 	case SLIDER_VERTICAL:
@@ -96,6 +112,8 @@ void Cslider::onPaint( int touch)
 
 	case SLIDER_VERTICAL_UPDOWN:
 		paintVertical();
+		break;
+	default:
 		break;
 	}
 	enableDrag();
@@ -126,20 +144,76 @@ void Cslider::paintVerticalUpDown()
 #endif
 
 /// @brief Paint a vertical slider.
+void Cslider::paintHorizontal()
+{
+	int  widthArrow =0;
+	double  maxWidth =(m_rect.width()-widthArrow); // Image height removed.
+	double offset_arrow =0;
+	int slidingRange =(int)(m_maximum-m_minimum-m_itemsOnScreen);
+	if ( slidingRange >0)
+	{
+		offset_arrow =maxWidth*8*(m_value-m_minimum) /(m_maximum-m_minimum-m_itemsOnScreen);
+	}
+	m_image_x=(int)offset_arrow+m_rect.left()*8;
+	m_graphics->setColour( Cgraphics::m_defaults.slider_background);
+	m_graphics->rectangle( m_rect.left()*8, m_rect.top()*8, m_rect.right()*8, m_rect.bottom()*8, 4,3);
+	m_graphics->setColour( Cgraphics::m_defaults.slider_lines);
+	int y=(m_rect.top()+m_rect.bottom())*8/2;
+	int x1=m_rect.left()*8+24;
+	int x2=m_rect.right()*8-24;
+	m_graphics->line( x1,y, x2,y);
+	m_graphics->line( x1,y-10, x1,y+10);
+	m_graphics->line( (x1+x2)/2,y-5, (x1+x2)/2,y+5);
+	m_graphics->line( x2,y-10, x2,y+10);
+
+	int left =m_rect.left()*8+(int)m_rect.width()*8/2-24;
+	m_graphics->image( Cgraphics::m_defaults.icon_slider48, left, m_image_y, left+47, m_image_y+47);
+}
+
+/// @brief Paint a vertical slider.
+void Cslider::paintHorizontalBar()
+{
+	int  widthArrow =0;
+	double  maxWidth =(m_rect.width()-widthArrow); // Image height removed.
+	double offset_arrow =0;
+	int slidingRange =(int)(m_maximum-m_minimum);
+	if ( slidingRange >0)
+	{
+		offset_arrow =maxWidth*8*(m_value-m_minimum) /(m_maximum-m_minimum);
+	}
+	m_image_x=(int)offset_arrow+m_rect.left()*8;
+	m_graphics->setColour( Cgraphics::m_defaults.slider_background);
+	m_graphics->rectangle( m_rect.left()*8, m_rect.top()*8, m_rect.right()*8, m_rect.bottom()*8, 4,3);
+	int y=(m_rect.top()+m_rect.bottom())*8/2;
+	int x1=m_rect.left()*8+4;
+	int x2=m_rect.right()*8-4;
+	m_graphics->setColour( Cgraphics::m_defaults.line_bright);
+	m_graphics->bar( x1,y-5,m_image_x,y+4,0);
+	m_graphics->setColour( Cgraphics::m_defaults.slider_lines);
+	m_graphics->line( x1,y, x2,y);
+	m_graphics->line( x1,y-10, x1,y+10);
+	m_graphics->line( (x1+x2)/2,y-5, (x1+x2)/2,y+5);
+	m_graphics->line( x2,y-10, x2,y+10);
+
+	//int left =m_rect.left()*8+(int)m_rect.width()*8/2-24;
+	//m_graphics->image( Cgraphics::m_defaults.icon_slider48, left, m_image_y, left+47, m_image_y+47);
+}
+
+/// @brief Paint a vertical slider.
 void Cslider::paintVertical()
 {
 	int  heightArrow =6;
 	double  maxHeight =(m_rect.height()-heightArrow); // Image height removed.
 	double offset_arrow =0;
-	int slidingRange =m_maximum-m_minimum-m_itemsOnScreen;
+	int slidingRange =(int)(m_maximum-m_minimum-m_itemsOnScreen);
 	if ( slidingRange >0)
 	{
 		offset_arrow =maxHeight*8*(m_value-m_minimum) /(m_maximum-m_minimum-m_itemsOnScreen);
 	}
 	m_image_y=(int)offset_arrow+m_rect.top()*8;
-	m_graphics->setColour( COLOUR("WHITE"));
+	m_graphics->setColour( Cgraphics::m_defaults.slider_background);
 	m_graphics->rectangle( m_rect.left()*8, m_rect.top()*8, m_rect.right()*8, m_rect.bottom()*8, m_rect.width()*4,m_rect.width()*3);
-	m_graphics->setColour( COLOUR("BLACK"));
+	m_graphics->setColour( Cgraphics::m_defaults.slider_lines);
 	int x=(m_rect.left()+m_rect.right())*8/2;
 	int y1=m_rect.top()*8+24;
 	int y2=m_rect.bottom()*8-24;
@@ -149,8 +223,9 @@ void Cslider::paintVertical()
 	m_graphics->line( x-10,y2, x+10,y2);
 
 	int left =m_rect.left()*8+(int)m_rect.width()*8/2-24;
-	m_graphics->image( ICON_SLIDER48, left, m_image_y, left+47, m_image_y+47);
+	m_graphics->image( Cgraphics::m_defaults.icon_slider48, left, m_image_y, left+47, m_image_y+47);
 }
+
 
 /*============================================================================*/
 ///
@@ -305,7 +380,6 @@ bool Cslider::onDrag( Cpoint p)
 		}
 		if ( m_value !=value)
 		{
-			Log.write("Value slider =%d", (int)value);
 			m_value =value;
 			return true;
 		}

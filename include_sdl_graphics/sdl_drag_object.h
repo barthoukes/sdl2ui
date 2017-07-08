@@ -11,19 +11,67 @@
  **              Cevent
  */
 /*------------------------------------------------------------------------------
- **  Copyright (c) Bart Houkes, 28 jan 2011
+ ** Copyright (C) 2011, 2014, 2015
+ ** Houkes Horeca Applications
  **
- **  Copyright notice:
- **  This software is property of Bart Houkes.
- **  Unauthorized duplication and disclosure to third parties is forbidden.
+ ** This file is part of the SDL2UI Library.  This library is free
+ ** software; you can redistribute it and/or modify it under the
+ ** terms of the GNU General Public License as published by the
+ ** Free Software Foundation; either version 3, or (at your option)
+ ** any later version.
+
+ ** This library is distributed in the hope that it will be useful,
+ ** but WITHOUT ANY WARRANTY; without even the implied warranty of
+ ** MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
+ ** GNU General Public License for more details.
+
+ ** Under Section 7 of GPL version 3, you are granted additional
+ ** permissions described in the GCC Runtime Library Exception, version
+ ** 3.1, as published by the Free Software Foundation.
+
+ ** You should have received a copy of the GNU General Public License and
+ ** a copy of the GCC Runtime Library Exception along with this program;
+ ** see the files COPYING3 and COPYING.RUNTIME respectively.  If not, see
+ ** <http://www.gnu.org/licenses/>
  **===========================================================================*/
+
+#pragma once
 
 /*------------- Standard includes --------------------------------------------*/
 
-#ifndef SDL_DRAGG_OBJECT_H_
-#define SDL_DRAGG_OBJECT_H_
+class CdialogObject;
 
-#ifdef USE_SDL2
+#include "sdl_rect.h"
+
+/// @brief Object to use for dragging around the screen
+class CdragObject
+{
+public:
+	CdragObject();
+	virtual ~CdragObject();
+	void 	clean();
+	CdragObject & operator =(CdialogObject* object);
+	bool isEmpty() { return !m_dragObject; }
+	void setObject( CdialogObject *object, Cpoint offset, Cpoint start);
+	void onPaint();
+	Cpoint dragTo( const Cpoint &finger);
+	bool moveTo( const Cpoint &finger);
+	Cpoint getDragPoint() { return m_dragPoint; }
+	bool start( const Cpoint &finger, CdialogObject *object);
+	bool stop( const Cpoint &finger);
+	Cpoint getTopLeft( const Cpoint mouse);
+
+public:
+	CdialogObject		*m_dragObject;		///< object to drag.
+private:
+	Cpoint 				m_dragStart;		///< Where to start dragging
+	Cpoint				m_dragOffset;		///< Drag offset in 800x600 res.
+	Cpoint              m_dragPoint;		///< Where to drag now
+	//Cdialog				*m_parent;			///< Parent dialog
+};
+
+
+#ifdef USE_SDL2222
 
 #include "sdl_rect.h"
 #include "SDL_rect.h"
@@ -61,4 +109,4 @@ private:
 };
 
 #endif
-#endif /* SDL_DRAG_OBJECT_H_ */
+/* END SDL_DRAG_OBJECT_H_ */

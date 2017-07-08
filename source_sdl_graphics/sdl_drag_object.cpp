@@ -1,17 +1,195 @@
-/*
- * sdl_drag_object.cpp
- *
- *  Created on: 21 jul. 2014
- *      Author: mensfort
+/*============================================================================*/
+/**  @file      sdl_drag_object.cpp
+ **  @ingroup   sdl2ui
+ **  @brief		Keep a drag object
+ **
+ **  Class to define the drag object(s).
+ **
+ **  @author     mensfort
+ **
+ **  @par Classes:
+ **              CdragObject
  */
+/*------------------------------------------------------------------------------
+ ** Copyright (C) 2011, 2014, 2015
+ ** Houkes Horeca Applications
+ **
+ ** This file is part of the SDL2UI Library.  This library is free
+ ** software; you can redistribute it and/or modify it under the
+ ** terms of the GNU General Public License as published by the
+ ** Free Software Foundation; either version 3, or (at your option)
+ ** any later version.
 
-#ifdef USE_SDL2
+ ** This library is distributed in the hope that it will be useful,
+ ** but WITHOUT ANY WARRANTY; without even the implied warranty of
+ ** MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
+ ** GNU General Public License for more details.
 
+ ** Under Section 7 of GPL version 3, you are granted additional
+ ** permissions described in the GCC Runtime Library Exception, version
+ ** 3.1, as published by the Free Software Foundation.
+
+ ** You should have received a copy of the GNU General Public License and
+ ** a copy of the GCC Runtime Library Exception along with this program;
+ ** see the files COPYING3 and COPYING.RUNTIME respectively.  If not, see
+ ** <http://www.gnu.org/licenses/>
+ **===========================================================================*/
+
+/*------------- Standard includes --------------------------------------------*/
 #include <stdio.h>
 #include "sdl_drag_object.h"
 #include "sdl_rect.h"
 #include "sdl_dialog_object.h"
+#include "sdl_dialog.h"
 
+/**
+ * Constructor drag object
+ * @param object [in] Related object
+ * @param origin [in] Location to paint for start
+ */
+CdragObject::CdragObject()
+: m_dragObject(NULL)
+, m_dragStart(0,0)
+, m_dragOffset(0,0)
+, m_dragPoint(0,0)
+{
+}
+
+CdragObject::~CdragObject()
+{
+}
+
+/** @remove the Drag object from screen */
+void CdragObject::clean()
+{
+	m_dragObject =NULL;
+}
+
+/** @brief Drag start finger
+ *  @param finger [in] New finger location
+ *  @param object [in] What object to move
+ *  @return true when done correct
+ */
+bool CdragObject::start( const Cpoint &finger, CdialogObject *object)
+{
+	try
+	{
+		m_dragStart =finger;
+		m_dragObject =object;
+		if ( m_dragObject)
+		{
+			if ( m_dragObject->m_dragEnable ==false)
+			{
+				clean();
+			}
+			else
+			{
+				// Cdialog::onEvent  drag start
+				m_dragOffset =m_dragStart-m_dragObject->m_rect.origin()*8;
+			}
+		}
+	}
+	catch(...)
+	{
+	}
+	return true;
+}
+
+/** @brief Drag the object to a new location
+ *  @param finger [in] New location for the finger
+ *  @return new location finger
+ */
+Cpoint CdragObject::dragTo( const Cpoint &leftTop)
+{
+	/** Drag an object to another location. */
+	Cpoint m=leftTop;
+	if ( !isEmpty())
+	{
+		//m =m-m_dragOffset;
+		Cpoint p( Cgraphics::m_defaults.width, Cgraphics::m_defaults.height);
+		try
+		{
+			p-=m_dragObject->m_rect.size()*8;
+		}
+		catch (...)
+		{
+			p =m_dragOffset;
+		}
+		m.limit( Cpoint( 0,0), p);
+		m_dragPoint =m;
+	}
+	return m;
+}
+
+/** @brief Move to location
+ *  @param point [in] New location to drag to
+ *  @return true on success
+ */
+bool CdragObject::moveTo( const Cpoint &point)
+{
+	Cpoint m=point;
+	if ( !isEmpty())
+	{
+		m -=m_dragOffset;
+		if ( m_dragPoint !=m)
+		{
+			//m_dragPoint =point;
+			dragTo(m);
+			return true;
+		}
+	}
+	return false;
+}
+
+/** @brief Release the finger from dragging the object
+ *  @param finger [in] Location to stop
+ *  @return true if the dialog object has some code to tell true.
+ */
+bool CdragObject::stop( const Cpoint &finger)
+{
+	if ( m_dragObject)
+	{
+		return m_dragObject->onDragEnd( finger);
+	}
+	return false;
+}
+
+Cpoint CdragObject::getTopLeft( const Cpoint mouse)
+{
+	Cpoint p =mouse-m_dragOffset;
+	return p;
+}
+
+/** Paint the drag object */
+void CdragObject::onPaint()
+{
+	if ( m_dragObject)
+	{
+		m_dragObject->m_graphics->lock_keycodes();
+		m_dragObject->onPaint( m_dragPoint.div8(),0);
+		m_dragObject->m_graphics->unlock_keycodes();
+	}
+}
+
+CdragObject & CdragObject::operator =(CdialogObject* object)
+{
+	m_dragObject =object;
+	return *this;
+}
+
+/** @brief Start dragging from a certain point
+ *  @param object [in] What to drag
+ *  @param offset [in] Where in the small image we start
+ *  @param start  [in] What location on screen we start
+ */
+void CdragObject::setObject( CdialogObject *object, Cpoint offset, Cpoint start)
+{
+	m_dragObject =object;
+	m_dragOffset =offset;
+	m_dragPoint  =start;
+}
+
+#if 0
 /**
  * Constructor drag object
  * @param object [in] Related object

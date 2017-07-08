@@ -1,6 +1,6 @@
 /*============================================================================*/
 /**  @file       sdl_button.cpp
- **  @ingroup    zhongcan_sdl
+ **  @ingroup    sdl2ui
  **  @brief		 Default button implementation.
  **
  **  Create a default button. This is a basic template for all buttons.
@@ -11,20 +11,32 @@
  **              Cbutton
  */
 /*------------------------------------------------------------------------------
- **  Copyright (c) Bart Houkes, 28 jan 2011
+ ** Copyright (C) 2011, 2014, 2015
+ ** Houkes Horeca Applications
  **
- **  Copyright notice:
- **  This software is property of Bart Houkes.
- **  Unauthorized duplication and disclosure to third parties is forbidden.
- **============================================================================*/
+ ** This file is part of the SDL2UI Library.  This library is free
+ ** software; you can redistribute it and/or modify it under the
+ ** terms of the GNU General Public License as published by the
+ ** Free Software Foundation; either version 3, or (at your option)
+ ** any later version.
+
+ ** This library is distributed in the hope that it will be useful,
+ ** but WITHOUT ANY WARRANTY; without even the implied warranty of
+ ** MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
+ ** GNU General Public License for more details.
+
+ ** Under Section 7 of GPL version 3, you are granted additional
+ ** permissions described in the GCC Runtime Library Exception, version
+ ** 3.1, as published by the Free Software Foundation.
+
+ ** You should have received a copy of the GNU General Public License and
+ ** a copy of the GCC Runtime Library Exception along with this program;
+ ** see the files COPYING3 and COPYING.RUNTIME respectively.  If not, see
+ ** <http://www.gnu.org/licenses/>
+ **===========================================================================*/
 
 /*------------- Standard includes --------------------------------------------*/
-
 #include "sdl_button.h"
-#include "sdl_button.h"
-#include "graphics_widgets.h"
-//#include "global.h"
-//#include "zhongcan_icon.h"
 
 /*============================================================================*/
 ///
@@ -48,13 +60,44 @@ CmenuButton::CmenuButton( const Crect &rect,
 {
     if ( icon.length())
 	{
-		m_image =icon;
-		m_imageEnable =true;
-		m_imageAlign =GRAVITY_LEFT;
+    	setImage( icon, GRAVITY_LEFT_CENTER);
+    	//m_image.setStyle( IMAGE_COLOUR, Cgraphics::m_defaults.menu_button_text);
 	}
- 	setColours( Cgraphics::m_defaults.button_text,
- 				Cgraphics::m_defaults.button_background1,
- 				Cgraphics::m_defaults.button_background2);
+ 	setColours( Cgraphics::m_defaults.menu_button_text,
+ 				Cgraphics::m_defaults.menu_button_background1,
+ 				Cgraphics::m_defaults.menu_button_background2);
+	m_button_shadow =Cgraphics::m_defaults.button_shadow;
+	roundedRectangle(8);
+}
+
+/*============================================================================*/
+///
+/// @brief Constructor special types.
+//
+/// @param rect [in] Position.
+/// @param type [in] What type of button.
+/// @param key  [in] What key.
+/// @param text [in] What text.
+/// @param icon [in] Which icon.
+///
+/*============================================================================*/
+CmenuButton::CmenuButton( const Crect &rect,
+						  keybutton key,
+						  const std::string &text,
+						  const std::string &icon)
+: Cbutton( NULL, rect, key, (Sfont)CtextFont("button"), text,
+		   BORDER_THIN_BUTTON_SHADOW,
+		   GRAVITY_CENTER, 8, FILL_PYRAMID)
+//					  Cbutton( rect, key, , id, BORDER_THIN, icon.length()? false:true, FILL_PYRAMID, icon)
+{
+    if ( icon.length())
+	{
+    	setImage( icon, GRAVITY_LEFT_CENTER);
+    	//m_image.setStyle( IMAGE_COLOUR, Cgraphics::m_defaults.menu_button_text);
+	}
+ 	setColours( Cgraphics::m_defaults.menu_button_text,
+ 				Cgraphics::m_defaults.menu_button_background1,
+ 				Cgraphics::m_defaults.menu_button_background2);
 	m_button_shadow =Cgraphics::m_defaults.button_shadow;
 	roundedRectangle(8);
 }
@@ -79,9 +122,7 @@ CbottomButton::CbottomButton( Cdialog *parent,
 {
     if ( icon.length())
 	{
-		m_image =icon;
-		m_imageEnable =true;
-		setGravity( GRAVITY_LEFT_CENTER);
+    	setImage( icon, GRAVITY_LEFT_CENTER);
 	}
 	setColours( Cgraphics::m_defaults.button_text,
 			    Cgraphics::m_defaults.button_background1,
@@ -98,16 +139,13 @@ CbottomButton::CbottomButton( Cdialog *parent,
 {
     if ( icon.length())
 	{
-		m_image =icon;
-		m_imageEnable =true;
-		setGravity( GRAVITY_LEFT_CENTER);
+    	setImage( icon, GRAVITY_LEFT_CENTER);
 	}
 	setColours( Cgraphics::m_defaults.button_text,
 			    Cgraphics::m_defaults.button_background1,
     			Cgraphics::m_defaults.button_background2);
 	roundedRectangle(0);
 }
-
 
 /*============================================================================*/
 ///
@@ -131,6 +169,32 @@ CkeyboardButton::CkeyboardButton( const Crect &rect,
 			Cgraphics::m_defaults.button_background2);
 	roundedRectangle(12);
 	setGravity( icon.length() ? GRAVITY_LEFT_CENTER:GRAVITY_CENTER);
+}
+
+/*============================================================================*/
+///
+/// @brief Constructor image with circular filled pattern.
+///
+/// @param parent [in] Who's my dialog?
+/// @param rect [in] Position
+/// @param key  [in] What key
+/// @param icon [in] Which icon
+/// @param background [in] Colour background
+///
+/*============================================================================*/
+CiconButton::CiconButton( Cdialog *parent,
+		                  const Crect &rect,
+						  keybutton key,
+						  const std::string &icon,
+						  colour background)
+: Cbutton( parent, rect, key, INVALID_TEXT_ID, BORDER_NONE, FILL_CIRCULAR)
+{
+	setColours( 0, Cgraphics::brighter( background, 50), background);
+	setBorder( BORDER_NONE, 0);
+	roundedRectangle( m_rect.height()*8/2-2);
+	//setGravity( GRAVITY_LEFT_CENTER);
+	setImage( icon, GRAVITY_CENTER);
+	setLabel("");
 }
 
 /*============================================================================*/
@@ -376,8 +440,25 @@ CcalculatorButton::CcalculatorButton( const Crect &rect,
 		   BORDER_THICK, GRAVITY_CENTER, 8, FILL_PYRAMID)
 {
 	setColours( Cgraphics::m_defaults.calculator_text,
-			    Cgraphics::m_defaults.calculator_background1,
-			    Cgraphics::m_defaults.calculator_background2);
+			    Cgraphics::m_defaults.calculator_background2,
+			    Cgraphics::m_defaults.calculator_background1);
+	setBorderColours( Cgraphics::m_defaults.calculator_border);
+	setSpacing(1);
+	setLabel("");
+	setShadow(0xff000000);
+}
+
+CcalculatorButton::CcalculatorButton( const Crect &rect,
+		       const std::string &s,
+   	   	       keybutton key,
+			   const std::string &img)
+: Cbutton( NULL, rect, key, (Sfont)CtextFont("calculator"), s,
+		   BORDER_THICK, GRAVITY_CENTER, 8, FILL_PYRAMID)
+{
+	setImage(img, GRAVITY_CENTER);
+	setColours( Cgraphics::m_defaults.calculator_text,
+			    Cgraphics::m_defaults.calculator_background2,
+			    Cgraphics::m_defaults.calculator_background1);
 	setBorderColours( Cgraphics::m_defaults.calculator_border);
 	setSpacing(1);
 	setLabel("");
@@ -390,8 +471,8 @@ CcalculatorButton::CcalculatorButton( Simage *image, int x, int y)
 		   image->name, BORDER_THICK, GRAVITY_CENTER, 8, FILL_PYRAMID)
 {
 	setColours( Cgraphics::m_defaults.calculator_text,
-			    Cgraphics::m_defaults.calculator_background1,
-			    Cgraphics::m_defaults.calculator_background2);
+			    Cgraphics::m_defaults.calculator_background2,
+			    Cgraphics::m_defaults.calculator_background1);
 	setBorderColours( Cgraphics::m_defaults.calculator_border);
 	//roundedRectangle(16);
 	setSpacing(1);
@@ -419,9 +500,8 @@ Cbutton::Cbutton( Cdialog *parent,
 : CdialogObject( parent, rect, code)
 , m_background( parent, rect, code, Cgraphics::m_defaults.button_background1,
 		        0, fill)
+, m_image( parent, rect, KEY_NOCHANGE, icon, BORDER_NONE, 3, "")
 , m_label( parent, rect, code)
-, m_icon( icon)
-, m_imageAlign( GRAVITY_LEFT)
 , m_textColour( Cgraphics::m_defaults.button_text)
 , m_border(border)
 , m_cross(false)
@@ -429,7 +509,6 @@ Cbutton::Cbutton( Cdialog *parent,
 , m_useText(true)
 , m_border1( Cgraphics::m_defaults.line_bright)
 , m_border2( Cgraphics::m_defaults.line_dark)
-, m_imageEnable( m_icon.length()>0)
 , m_alignBottom(false)
 , m_textButton(NULL)
 , m_style( TTF_STYLE_NORMAL)
@@ -438,7 +517,9 @@ Cbutton::Cbutton( Cdialog *parent,
 , m_spacing(0)
 , m_shadow(0)
 , m_button_shadow(0)
+, m_imageGravity(GRAVITY_CENTER)
 {
+	m_image.setGravity( GRAVITY_LEFT);
 	Sfont font( CtextFont("small_button"));
 	m_textButton =new Ctext( m_parent, m_rect, code, font, id,
 			                 Cgraphics::m_defaults.button_text,
@@ -452,7 +533,6 @@ Cbutton::Cbutton( Cdialog *parent,
 	{
 		m_useText =false;
 	}
-	addDefaultIcon();
 	m_horizontal_margin =2;
 	m_vertical_margin =2;
 	roundedRectangle(0);
@@ -477,9 +557,9 @@ Cbutton::Cbutton( Cdialog *parent,
 		          const std::string &icon)
 : CdialogObject( parent, rect, code)
 , m_background( parent, rect, code, Cgraphics::m_defaults.button_background2, 0, fill)
+, m_image( parent, rect, KEY_NOCHANGE, icon, BORDER_NONE, 3, "")
 , m_label( parent, rect, code)
-, m_icon( icon)
-, m_imageAlign( GRAVITY_LEFT)
+, m_text( text)
 , m_textColour( Cgraphics::m_defaults.button_text)
 , m_border(border)
 , m_cross(false)
@@ -487,7 +567,6 @@ Cbutton::Cbutton( Cdialog *parent,
 , m_useText(true)
 , m_border1( Cgraphics::m_defaults.line_bright)
 , m_border2( Cgraphics::m_defaults.line_dark)
-, m_imageEnable( m_icon.length()>0)
 , m_textButton(NULL)
 , m_style( TTF_STYLE_NORMAL)
 , m_horizontal_margin(0)
@@ -495,7 +574,9 @@ Cbutton::Cbutton( Cdialog *parent,
 , m_spacing(0)
 , m_shadow(0)
 , m_button_shadow(0)
+, m_imageGravity(GRAVITY_CENTER)
 {
+	m_image.setGravity( GRAVITY_LEFT);
 	m_noBackground =false;
 	if ( border ==BORDER_NONE)
 	{
@@ -508,7 +589,6 @@ Cbutton::Cbutton( Cdialog *parent,
 			                 GRAVITY_CENTER);
 	m_horizontal_margin =2;
 	m_vertical_margin =2;
-	addDefaultIcon();
 	roundedRectangle( 0);
 }
 
@@ -534,8 +614,8 @@ Cbutton::Cbutton( Cdialog *parent,
 : CdialogObject( parent, rect, code)
 , m_background( parent, rect, code, Cgraphics::m_defaults.button_background2,
 		   radius, fill, Cgraphics::m_defaults.button_background2)
+, m_image( parent, rect, KEY_NOCHANGE, "", BORDER_NONE, 3, "")
 , m_label( parent, rect, code)
-, m_imageAlign( GRAVITY_LEFT_CENTER)
 , m_textColour( Cgraphics::m_defaults.button_text)
 , m_border(border)
 , m_cross(false)
@@ -543,7 +623,7 @@ Cbutton::Cbutton( Cdialog *parent,
 , m_useText(false)
 , m_border1(Cgraphics::m_defaults.line_dark)
 , m_border2(Cgraphics::m_defaults.line_bright)
-, m_imageEnable(false)
+, m_alignBottom(false)
 , m_textButton(NULL)
 , m_style( TTF_STYLE_NORMAL)
 , m_horizontal_margin(0)
@@ -551,6 +631,8 @@ Cbutton::Cbutton( Cdialog *parent,
 , m_spacing(0)
 , m_shadow(0)
 , m_button_shadow(0)
+, m_imageSize(0)
+, m_imageGravity(GRAVITY_CENTER)
 {
 	m_textButton =new Ctext( m_parent, m_rect, code, font, id,
 							 Cgraphics::m_defaults.button_text,
@@ -560,7 +642,6 @@ Cbutton::Cbutton( Cdialog *parent,
 	{
 		m_noBackground =true;
 	}
-	addDefaultIcon();
 }
 
 Cbutton::Cbutton( Cdialog *parent,
@@ -575,8 +656,8 @@ Cbutton::Cbutton( Cdialog *parent,
 : CdialogObject( parent, rect, code)
 , m_background( parent, rect, code, Cgraphics::m_defaults.button_background2,
 		    radius, fill, Cgraphics::m_defaults.button_background2)
+, m_image( parent, rect, KEY_NOCHANGE, "", BORDER_NONE, 3, "")
 , m_label( parent, rect, code)
-, m_imageAlign( GRAVITY_LEFT_CENTER)
 , m_text( text)
 , m_textColour( Cgraphics::m_defaults.button_text)
 , m_border(border)
@@ -585,7 +666,7 @@ Cbutton::Cbutton( Cdialog *parent,
 , m_useText(true)
 , m_border1( Cgraphics::m_defaults.line_dark)
 , m_border2( Cgraphics::m_defaults.line_bright)
-, m_imageEnable(false)
+, m_alignBottom(false)
 , m_textButton(NULL)
 , m_style( TTF_STYLE_NORMAL)
 , m_horizontal_margin(1)
@@ -593,7 +674,11 @@ Cbutton::Cbutton( Cdialog *parent,
 , m_spacing(0)
 , m_shadow(0)
 , m_button_shadow(0)
+, m_imageSize(0)
+, m_imageGravity(GRAVITY_CENTER)
 {
+	//, m_imageAlign( GRAVITY_LEFT_CENTER)
+
 	m_textButton =new Ctext( m_parent, m_rect, code, font, text,
 							 Cgraphics::m_defaults.button_text, gravity);
 	m_noBackground =false;
@@ -601,7 +686,6 @@ Cbutton::Cbutton( Cdialog *parent,
 	{
 		m_noBackground =true;
 	}
-	addDefaultIcon();
 }
 
 /*============================================================================*/
@@ -625,102 +709,6 @@ void Cbutton::onPaint( const Cpoint &p, int touch)
 
 /*============================================================================*/
 ///
-/// @brief Add the appropriate image to a button.
-///
-/*============================================================================*/
-void Cbutton::addDefaultIcon()
-{
-	if ( m_image.length()!=0)
-	{
-		m_imageEnable =true;
-		m_imageAlign =GRAVITY_CENTER;
-		return;
-	}
-#if 0
-	if ( m_border==BORDER_NONE && m_textId==_NO_TEXT)
-	{
-		m_imageAlign =GRAVITY_CENTER;
-		m_imageEnable =true;
-		switch ( m_code)
-		{
-		case KEY_DELETE:
-			m_image =ICON_ERASE48;
-			break;
-		case KEY_CANCEL:
-			m_image =ICON_CANCEL48;
-			break;
-		case KEY_BACK:
-			m_image =ICON_BACK48;
-			break;
-		case KEY_NEXT:
-			m_image =ICON_NEXT48;
-			break;
-		default:
-			m_imageEnable =false;
-			break;
-		}
-	}
-	if ( m_imageEnable ==true)
-	{
-		m_noBackground =true;
-		return;
-	}
-	m_imageEnable =true;
-	switch (m_textId)
-	{
-	case _CALCULATOR:
-		m_image =ICON_CALC32;
-		break;
-	case _CHANGELANG:
-		m_image =ICON_LANGUAGES32;
-		break;
-	case _CANCEL:
-		m_image =ICON_CANCEL32;
-		break;
-	case _OK:
-		m_image =ICON_ENTER32;
-		break;
-	case _SHUTDOWN:
-		m_image =ICON_SHUTDOWN32;
-		break;
-	case _LOCK:
-		m_image =ICON_SCREENSAVER32;
-		break;
-	case _EXIT:
-		m_image =ICON_LINUX32;
-		break;
-	case _BACK:
-		m_image =ICON_BACK32;
-		break;
-	case _NEXT:
-		m_image =ICON_NEXT32;
-		break;
-	case _PRIJS_PP:
-		m_image =ICON_EURO32;
-		break;
-	case _PAGE_ORDER:
-		m_image =ICON_SITIN32;
-		break;
-	//case _TABLE_MAP_ORDER:
-	//	m_image =ICON_FLOORPLAN;
-	//	break;
-	case _PRICE_CHANGE:
-	case _BILL_OPTION:
-		m_image =ICON_EURO32;
-		break;
-	default:
-		//m_imageEnable =false;
-		break;
-	}
-	if ( m_imageEnable ==true)
-	{
-		return;
-	}
-#endif
-}
-
-/*============================================================================*/
-///
 /// @brief Destructor.
 ///
 /*============================================================================*/
@@ -731,6 +719,32 @@ Cbutton::~Cbutton()
 		delete m_textButton;
 		m_textButton =NULL;
 	}
+}
+
+/** @brief Paint the image here.
+ */
+void Cbutton::paintImage()
+{
+//	int mywidth=width();
+//	int myheight=height();
+//	int hspace=(mywidth-m_imageSize)/2;
+//	int vspace=(myheight-m_imageSize)/2;
+//	int l,t;
+//
+//	switch (m_image.gravity())
+//	{
+//	case GRAVITY_LEFT:  		l=left();        t=top(); break;
+//	case GRAVITY_LEFT_CENTER:	l=left();        t=top()+vspace; break;
+//	case GRAVITY_LEFT_BOTTOM:	l=left();        t=bottom()-m_imageSize; break;
+//	case GRAVITY_RIGHT_CENTER:	l=right()-m_imageSize;     t=top()+vspace; break;
+//	case GRAVITY_RIGHT_BOTTOM:	l=right()-m_imageSize;     t=bottom()-m_imageSize; break;
+//	case GRAVITY_RIGHT:			l=right()-m_imageSize;     t=top(); break;
+//	case GRAVITY_TOP_CENTER:	l=left()+hspace; t=top(); break;
+//	case GRAVITY_BOTTOM_CENTER:	l=left()+hspace; t=bottom()-m_imageSize; break;
+//	default:
+//	case GRAVITY_CENTER:		l=left()+hspace; t=top()+vspace; break;
+//	}
+	m_image.onPaint( Cpoint(left(),top()), 0);
 }
 
 /*============================================================================*/
@@ -753,7 +767,7 @@ void Cbutton::onPaint( const std::string &text, int touch)
 	// Draw button edge.
 	paintBorder( m_border, m_spacing, m_background.getRadius(), touch);
 	// Draw button image.
-	paintImage( touch);
+	paintImage();
 	// Draw button text.
 	paintText(text, touch);
 	// Draw label.
@@ -802,6 +816,7 @@ void Cbutton::paintBorder( EborderType border, int spacing, int radius, int touc
 {
 	int linewidth =2;
 	colour col1=0,col2=0;
+	(void)touch;
 
 	switch ( border)
 	{
@@ -867,59 +882,6 @@ void Cbutton::paintBorder( EborderType border, int spacing, int radius, int touc
 
 /*============================================================================*/
 ///
-/// @brief Paint image next to text.
-///
-/*============================================================================*/
-void Cbutton::paintImage( int touch)
-{
-	if ( m_imageEnable==false || m_image.empty()==true)
-	{
-		return;
-	}
-	int x1 = (m_rect.left() << 3)+8 , y1 =(m_rect.top() << 3);
-	int x2 = (m_rect.right() << 3)-8, y2 =(m_rect.bottom() << 3);
-    y1+=8;
-    y2-=8;
-    SDL_Surface *s=m_graphics->findImage( m_image);
-	int sizex=32, sizey=32;
-	if (m_border ==BORDER_NONE)
-	{
-		sizex=48;
-		sizey=48;
-	}
-	if (s)
-	{
-		sizex =gMin( s->w, 8*m_rect.width());
-		sizey =gMin( s->h, 8*m_rect.height());
-	}
-	switch( m_imageAlign)
-	{
-	case GRAVITY_LEFT:
-		y1=(y1+y2)/2-(sizey/2);
-		break;
-
-	case GRAVITY_CENTER:
-		x1=(x1+x2)/2-(sizex/2);
-		y1=(y1+y2)/2-(sizey/2);
-		break;
-
-	case GRAVITY_RIGHT:
-		x1=x2-sizex;
-		y1=(y1+y2)/2-(sizey/2);
-		break;
-
-	case GRAVITY_LEFT_CENTER:
-		y1=(y1+y2)/2-(sizey/2);
-		break;
-
-	default:
-		return;
-	}
-	m_graphics->image( m_image, x1, y1, x1+sizex, y1+sizex);
-}
-
-/*============================================================================*/
-///
 /// @brief Paint alternate text.
 ///
 /// @brief text [in] Alternative text.
@@ -927,16 +889,38 @@ void Cbutton::paintImage( int touch)
 /*============================================================================*/
 void Cbutton::paintText( const std::string &text, int touch)
 {
+	if ( !*text.c_str())
+	{
+		// Nothing to do
+		return;
+	}
 	if ( m_textButton)
 	{
 		m_textButton->setStyle( m_style);
 		m_textButton->setColour( m_textColour);
 		m_textButton->setRect( m_rect);
 		m_textButton->setShadow( m_shadow);
-		if ( m_image.length()>0)
+		if ( m_image.isVisible())
 		{
-			m_textButton->m_rect.move(6,0);
-			m_textButton->m_rect.decrease(6,0);
+			switch (m_imageGravity)
+			{
+			case GRAVITY_LEFT:
+			case GRAVITY_LEFT_CENTER:
+			case GRAVITY_LEFT_BOTTOM:
+				m_textButton->m_rect.move( 6,0);
+				m_textButton->m_rect.decrease( 6,0);
+				break;
+			default:
+			case GRAVITY_RIGHT_CENTER:
+			case GRAVITY_RIGHT_BOTTOM:
+			case GRAVITY_CENTER:
+			case GRAVITY_RIGHT:
+			case GRAVITY_TOP_CENTER:
+			case GRAVITY_BOTTOM_CENTER:
+			case GRAVITY_RESIZE:
+			case GRAVITY_BEHIND_TEXT:
+				break;
+			}
 		}
 		m_textButton->setMargin( m_horizontal_margin, m_vertical_margin);
 		m_textButton->onPaint( text, touch);
@@ -945,7 +929,7 @@ void Cbutton::paintText( const std::string &text, int touch)
 	// OLD METHOD.
 	int x=m_rect.left(), y=m_rect.top();
 	int w=m_rect.width(), h=m_rect.height();
-	if ( m_imageEnable && m_imageAlign==GRAVITY_LEFT)
+	if ( m_image.isVisible() && m_image.gravity()==GRAVITY_LEFT)
 	{
 		x+=4;
 		w-=4;
@@ -953,6 +937,10 @@ void Cbutton::paintText( const std::string &text, int touch)
 	Ctext( m_parent, Crect( x+m_horizontal_margin,y+m_vertical_margin,
 			 w-2*m_horizontal_margin,h-2*m_vertical_margin),
 			 m_code, (Sfont)CtextFont("amounts"), text, m_textColour).onPaint(0);
+	if ( m_label.m_rect.bottom() !=m_rect.bottom())
+	{
+		m_label.calculateSize( m_rect);
+	}
 	m_label.onPaint(0);
 }
 
@@ -963,6 +951,10 @@ void Cbutton::paintText( const std::string &text, int touch)
 /*============================================================================*/
 void Cbutton::paintLabel()
 {
+	if ( m_label.m_rect.bottom() !=m_rect.bottom())
+	{
+		m_label.calculateSize( m_rect);
+	}
 	m_label.onPaint(0);
 }
 
@@ -1043,12 +1035,20 @@ std::string Cbutton::getText()
 /*============================================================================*/
 void Cbutton::setImage( const std::string &image, Egravity horizontal)
 {
-	m_image =image;
-	if (horizontal!=GRAVITY_NO_CHANGE)
+	switch ( m_rect.height())
 	{
-		m_imageAlign =horizontal;
+	case 3: m_imageSize=2; break;
+	case 4:
+	case 5:
+	case 6:	m_imageSize=4; break;
+	case 7:
+	case 8:
+	case 9: m_imageSize=5; break;
+	case 10:
+	default:m_imageSize =8; break;
 	}
-	m_imageEnable =(m_image.size() >0);
+	m_imageGravity =horizontal;
+	m_image.setImage( image, horizontal, m_imageSize);
 }
 
 /*============================================================================*/
@@ -1113,7 +1113,10 @@ void Cbutton::setBackgroundColour( colour background1, colour background2)
 void Cbutton::setBorder( EborderType border, int radius)
 {
 	m_border =border;
-	m_background.setRadius( radius);
+	if ( radius>=0)
+	{
+		m_background.setRadius( radius);
+	}
 }
 
 /// @brief Set style to fill.
@@ -1142,8 +1145,5 @@ CtextButton::CtextButton( Cdialog *parent,
 			    Cgraphics::m_defaults.text_button_background1,
 			    Cgraphics::m_defaults.text_button_background1);
 	setBorderColours( Cgraphics::m_defaults.text_button_border);
-	//roundedRectangle(8);
 	setSpacing(1);
-	//setLabel("");
-	//setShadow(0xff000000);
 }

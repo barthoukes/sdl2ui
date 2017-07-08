@@ -1,6 +1,6 @@
 /*============================================================================*/
 /**  @file       message_box.cpp
- **  @ingroup    zhongcan_sdl
+ **  @ingroup    sdl2ui
  **  @brief		 Mai dan.
  **
  **  Simple message box.
@@ -11,21 +11,40 @@
  **              CmessageBox
  */
 /*------------------------------------------------------------------------------
- **  Copyright (c) Bart Houkes, 7 mrt 2011
+ ** Copyright (C) 2011, 2014, 2015
+ ** Houkes Horeca Applications
  **
- **  Copyright notice:
- **  This software is property of Bart Houkes.
- **  Unauthorized duplication and disclosure to third parties is forbidden.
+ ** This file is part of the SDL2UI Library.  This library is free
+ ** software; you can redistribute it and/or modify it under the
+ ** terms of the GNU General Public License as published by the
+ ** Free Software Foundation; either version 3, or (at your option)
+ ** any later version.
+
+ ** This library is distributed in the hope that it will be useful,
+ ** but WITHOUT ANY WARRANTY; without even the implied warranty of
+ ** MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
+ ** GNU General Public License for more details.
+
+ ** Under Section 7 of GPL version 3, you are granted additional
+ ** permissions described in the GCC Runtime Library Exception, version
+ ** 3.1, as published by the Free Software Foundation.
+
+ ** You should have received a copy of the GNU General Public License and
+ ** a copy of the GCC Runtime Library Exception along with this program;
+ ** see the files COPYING3 and COPYING.RUNTIME respectively.  If not, see
+ ** <http://www.gnu.org/licenses/>
  **===========================================================================*/
 
 /*------------- Standard includes --------------------------------------------*/
 #include <assert.h>
 #include "sdl_message_box.h"
-#include "graphics_widgets.h"
 #include "timeout.h"
 #include "sdl_dialog_list.h"
+#include "timestamp.h"
 
-#define D false
+#define BTN_WIDTH  (Cgraphics::m_defaults.button_height+2)
+#define BTN_HEIGHT (Cgraphics::m_defaults.button_height)
+
 
 #if MBX
 void *messagebox_interrupt(void *mbx)
@@ -40,22 +59,23 @@ void *messagebox_interrupt(void *mbx)
 }
 #endif
 
-CmessageBox::CmessageBox( const std::string &name, EtextId id)
+/** @brief Constructor message box
+ *  @param name [in] Name for message box
+ *  @param id [in] Text id for top string
+ */
+CmessageBox::CmessageBox( const std::string &name, textId id)
 : Cdialog( NULL, name, Crect( 56, 4, 30, 18))
-, m_ok( this, Crect( 0,0,13,6), KEY_CR, Cgraphics::m_defaults.icon_ok48)
-, m_cancel( this, Crect( 0,0,13,6), KEY_CANCEL, Cgraphics::m_defaults.icon_cancel48)
+, m_ok( this, Crect( 0,0, BTN_WIDTH,BTN_HEIGHT), KEY_CR, Cgraphics::m_defaults.icon_ok48)
+, m_cancel( this, Crect( 0,0, BTN_WIDTH,BTN_HEIGHT), KEY_CANCEL, Cgraphics::m_defaults.icon_cancel48)
 {
 	m_push =true;
 
-	m_text = Lin[id][Lang];
+	m_text =Cgraphics::m_defaults.get_translation( id, Cgraphics::m_defaults.country);
 	setFlags( MB_TIME2|MB_BEEP);
 	registerMessageBox();
 	if ( m_flags & MB_DARKEN)
 	{
-		DarkenAT(0,0, SQUARES_WIDTH, SQUARES_HEIGHT);
-	}	if ( m_flags & MB_DARKEN)
-	{
-		DarkenAT(0,0, SQUARES_WIDTH, SQUARES_HEIGHT);
+		m_graphics->darken( 0,0,0,0);
 	}
 
 	if ( !(m_flags & MB_RETURN_IMMEDIATELY))
@@ -64,14 +84,18 @@ CmessageBox::CmessageBox( const std::string &name, EtextId id)
 	}
 	else if ( m_in_main_thread ==true)
 	{
-		g_messageBox.lock();
-
+		m_world->lock();
+		onInit();
 		onClearScreen();
 		onPaintButtons();
 		onPaint();
+		if (m_render_after_paint)
+		{
+			onRender();
+		}
 		onDisplay();
 
-		g_messageBox.unlock();
+		m_world->unlock();
 	}
 }
 
@@ -86,7 +110,7 @@ void CmessageBox::registerMessageBox()
 {
 	m_push =true;
 	m_isMessageBox=true;
-	Cdialog::registerMessageBox(this);
+	m_world->registerMessageBox(this);
 }
 
 /*============================================================================*/
@@ -103,7 +127,7 @@ int CmessageBox::onExecute( Cdialog *parent)
 	CdialogBase *a;
 	(void)parent;
 
-	if(D)Log.write( "begin CmessageBox::onExecute:%s %d", m_name.c_str(), m_in_main_thread);
+	// "begin CmessageBox::onExecute:%s %d", m_name.c_str(), m_in_main_thread);
 	m_running =true;
 
 	if (onInit() == false)
@@ -126,18 +150,21 @@ int CmessageBox::onExecute( Cdialog *parent)
   		//if (m_invalidate && m_in_main_thread)
   		if ( m_in_main_thread)
 		{
-			g_myWorld.lock();
-			Lang =m_language;
+			m_world->lock();
 			if ( m_visible)
 			{
 				onClearScreen();
 				onPaintButtons();
 				onPaint();
+				if (m_render_after_paint)
+				{
+					onRender();
+				}
 				m_invalidate =false;
 			}
 			onDisplay();
 			m_invalidate =false;
-			g_myWorld.unlock();
+			m_world->unlock();
 		}
 		if ( onLoop() ==false)
 		{
@@ -185,14 +212,14 @@ int CmessageBox::onExecute( Cdialog *parent)
 		}
 	}
 	stopExecute();
-	if(D)Log.write("Cdialog::onExecute onCleanUp");
+	// "Cdialog::onExecute onCleanUp");
 	onCleanup();
 	for ( a=m_children.firstDialog(); a !=NULL; a =m_children.nextDialog( a))
 	{
 		Cdialog *d=dynamic_cast<Cdialog*>(a);
 		if (d) d->onCleanup();
 	}
-	//Log.write("end Cdialog::onExecute:%s %d", m_name.c_str(), m_exitValue);
+	// ("end Cdialog::onExecute:%s %d", m_name.c_str(), m_exitValue);
 	delay(50);
 	if ( m_selfDestruct)
 	{
@@ -206,9 +233,12 @@ int CmessageBox::onExecute( Cdialog *parent)
 	return m_exitValue;
 }
 
+/** @brief Stop message box
+ *  @param exitValue [in] Value for exit
+ */
 void CmessageBox::stop(int exitValue)
 {
-	if(D)Log.write( "Stop message box %s exit=%d", m_name.c_str(), exitValue);
+	// ( "Stop message box %s exit=%d", m_name.c_str(), exitValue);
 	m_exitValue=exitValue;
 	m_running =false;
 	invalidate();
@@ -217,7 +247,7 @@ void CmessageBox::stop(int exitValue)
 /*============================================================================*/
 ///
 /// @brief 		Set flags for message box.
-///
+/// @param		FLAGS [in] Flags for data
 /// @post       Flags set, maybe popup sound played.
 ///
 /*============================================================================*/
@@ -226,30 +256,30 @@ void CmessageBox::setFlags( int FLAGS)
 	m_flags =FLAGS;
 	if ( m_flags & MB_BEEP)
 	{
-		Caudio::Instance()->play(AUDIO_POPUP);
+		Caudio::Instance()->play( Cgraphics::m_defaults.audio_popup);
 		m_flags &=~MB_BEEP;
 	}
 
 	/* Return if nessecary */
 	if ( m_flags & MB_TIME1)
 	{
-		m_timer.setTime( CFG("messagebox_time")*2, 0, 1);
+		m_timer.setTime( Cgraphics::m_defaults.messagebox_time*2, 1000, 1);
 	}
 	if (m_flags & MB_TIME2)
 	{
-		m_timer.setTime( CFG("messagebox_time")*4, 0, 1);
+		m_timer.setTime( Cgraphics::m_defaults.messagebox_time*4, 1000, 1);
 	}
 	if (m_flags & MB_TIME3)
 	{
-		m_timer.setTime( CFG("messagebox_time")*8, 0, 1);
+		m_timer.setTime( Cgraphics::m_defaults.messagebox_time*8, 1000, 1);
 	}
 	if (m_flags & MB_TIME5)
 	{
-		m_timer.setTime( CFG("messagebox_time")*10, 0, 1);
+		m_timer.setTime( Cgraphics::m_defaults.messagebox_time*10, 1000, 1);
 	}
 	if (m_flags & MB_TIME10)
 	{
-		m_timer.setTime( CFG("messagebox_time")*20, 0, 1);
+		m_timer.setTime( Cgraphics::m_defaults.messagebox_time*20, 1000, 1);
 	}
 	m_selfDestruct =false;
 	if ( m_flags & MB_SELF_DESTRUCT)
@@ -260,64 +290,104 @@ void CmessageBox::setFlags( int FLAGS)
 	{
 		m_visible =false;
 	}
+	if ( m_flags & MB_OK)
+	{
+		registerObject( &m_ok);
+	}
+	if ( m_flags & MB_QUIT)
+	{
+		registerObject( &m_cancel);
+	}
 }
 
+/** @brief Construct a message box
+ *  @param name [in] name of dialog
+ *  @param x [in] Position
+ *  @param y [in] Position
+ *  @param w [in] Width
+ *  @param h [in] Height
+ *  @param Text [in] Text string for top
+ *  @param FLAGS [in] All floags for message box
+ */
 CmessageBox::CmessageBox( const std::string &name, int x, int y, int w, int h,
 		const std::string &Text, int FLAGS) :
 	Cdialog( NULL, name, Crect(x, y, w, h))
-, m_ok( this, Crect( 0,0,13,6), KEY_CR, ICON_OK_TEXT48)
-, m_cancel( this, Crect( 0,0,13,6), KEY_CANCEL, ICON_CANCEL_TEXT48)
+, m_ok( this, Crect( 0,0, BTN_WIDTH,BTN_HEIGHT), KEY_CR, Cgraphics::m_defaults.icon_ok48)
+, m_cancel( this, Crect( 0,0, BTN_WIDTH,BTN_HEIGHT), KEY_CANCEL, Cgraphics::m_defaults.icon_cancel48)
 {
 	m_text =Text;
 	setFlags(FLAGS);
 	registerMessageBox();
 	if ( m_flags & MB_DARKEN)
 	{
-		DarkenAT(0,0, SQUARES_WIDTH, SQUARES_HEIGHT);
+
+		graphics()->darken(0,0,0,0);
 	}
+	onInit();
 	if ( m_flags & MB_DISPLAY_IMMEDIATELY)
 	{
-		g_messageBox.lock();
+		m_world->lock();
 
+		onInit();
 		onClearScreen();
 		onPaintButtons();
 		onPaint();
+		if (m_render_after_paint)
+		{
+			onRender();
+		}
 		onDisplay();
 
-		g_messageBox.unlock();
+		m_world->unlock();
 	}
 	if ( !(m_flags & (MB_SELF_DESTRUCT | MB_RETURN_IMMEDIATELY)))
 	{
 		onExecute( NULL);
 	}
-	g_messageBox.lock();
+	m_world->lock();
 	//m_in_main_thread =false;
 	m_running =true;
-	g_messageBox.unlock();
+	m_world->unlock();
 }
 
-CmessageBox::CmessageBox(  const std::string &name, int x, int y, int w, int h, EtextId id, int FLAGS) :
+/** @brief Construct a message box
+ *  @param name [in] name of dialog
+ *  @param x [in] Position
+ *  @param y [in] Position
+ *  @param w [in] Width
+ *  @param h [in] Height
+ *  @param id [in] Text id for top string
+ *  @param FLAGS [in] All floags for message box
+ */
+CmessageBox::CmessageBox(  const std::string &name, int x, int y, int w, int h, textId id, int FLAGS) :
 			Cdialog( NULL, name, Crect(x, y, w, h))
-, m_ok( this, Crect( 0,0,13,6), KEY_CR, ICON_OK_TEXT48)
-, m_cancel( this, Crect( 0,0,13,6), KEY_CANCEL, ICON_CANCEL_TEXT48)
+, m_ok( this, Crect( 0,0,Cgraphics::m_defaults.button_height+2,Cgraphics::m_defaults.button_height), KEY_CR, Cgraphics::m_defaults.icon_ok48)
+, m_cancel( this, Crect( 0,0, BTN_WIDTH,BTN_HEIGHT), KEY_CANCEL, Cgraphics::m_defaults.icon_cancel48)
 {
-	m_text = Lin[id][Lang];
+	m_text =Cgraphics::m_defaults.get_translation( id, Cgraphics::m_defaults.country);
 	setFlags(FLAGS);
 	registerMessageBox();
 	if ( m_flags & MB_DARKEN)
 	{
-		DarkenAT(0,0, SQUARES_WIDTH, SQUARES_HEIGHT);
+		graphics()->darken( 0,0, Cgraphics::m_defaults.width, Cgraphics::m_defaults.height);
 	}
+	onInit();
+
 	if ( m_flags & MB_DISPLAY_IMMEDIATELY)
 	{
-		g_messageBox.lock();
+		m_world->lock();
 
+		onInit();
 		onClearScreen();
 		onPaintButtons();
 		onPaint();
+		if (m_render_after_paint)
+		{
+			onRender();
+		}
 		onDisplay();
 
-		g_messageBox.unlock();
+		m_world->unlock();
 	}
 
 	if ( !(m_flags & MB_RETURN_IMMEDIATELY))
@@ -328,26 +398,37 @@ CmessageBox::CmessageBox(  const std::string &name, int x, int y, int w, int h, 
 	m_running =true;
 }
 
-CmessageBox::CmessageBox( const std::string &name, const Crect &xx, EtextId id, int FLAGS)
+/** @brief Construct a message box
+ *  @param name [in] name of dialog
+ *  @param xx [in] Position and size dialog
+ *  @param id [in] Text id for top string
+ *  @param FLAGS [in] All floags for message box
+ */
+CmessageBox::CmessageBox( const std::string &name, const Crect &xx, textId id, int FLAGS)
 : Cdialog( NULL, name, xx)
-, m_ok( this, Crect( 0,0,13,6), KEY_CR, ICON_OK_TEXT48)
-, m_cancel( this, Crect( 0,0,13,6), KEY_CANCEL, ICON_CANCEL_TEXT48)
+, m_ok( this, Crect( 0,0, BTN_WIDTH,BTN_HEIGHT), KEY_CR, Cgraphics::m_defaults.icon_ok48)
+, m_cancel( this, Crect( 0,0, BTN_WIDTH,BTN_HEIGHT), KEY_CANCEL, Cgraphics::m_defaults.icon_cancel48)
 {
-	m_text = Lin[id][Lang];
+	m_text =Cgraphics::m_defaults.get_translation( id, Cgraphics::m_defaults.country);
 	setFlags(FLAGS);
 	registerMessageBox();
 	if ( m_flags & MB_DARKEN)
 	{
-		DarkenAT(0,0, SQUARES_WIDTH, SQUARES_HEIGHT);
+		m_graphics->darken( 0,0,0,0);
 	}
 	if ( m_flags & MB_DISPLAY_IMMEDIATELY)
 	{
-		g_messageBox.lock();
+		m_world->lock();
+		onInit();
 		onClearScreen();
 		onPaintButtons();
 		onPaint();
+		if (m_render_after_paint)
+		{
+			onRender();
+		}
 		onDisplay();
-		g_messageBox.unlock();
+		m_world->unlock();
 	}
 
 	if ( !(m_flags & MB_RETURN_IMMEDIATELY))
@@ -367,8 +448,8 @@ keybutton CmessageBox::key()
 
 CmessageBox::CmessageBox( const std::string &name) :
 			Cdialog( NULL, name, Crect(56, 4, 20, 8))
-, m_ok( this, Crect( 0,0,13,6), KEY_CR, ICON_OK_TEXT48)
-, m_cancel( this, Crect( 0,0,13,6), KEY_CANCEL, ICON_CANCEL_TEXT48)
+, m_ok( this, Crect( 0,0, BTN_WIDTH,BTN_HEIGHT), KEY_CR, Cgraphics::m_defaults.icon_ok48)
+, m_cancel( this, Crect( 0,0, BTN_WIDTH,BTN_HEIGHT), KEY_CANCEL, Cgraphics::m_defaults.icon_cancel48)
 {
 	// TODO Auto-generated constructor stub
 	//pushScreen();
@@ -376,32 +457,66 @@ CmessageBox::CmessageBox( const std::string &name) :
 
 	if ( m_flags & MB_DISPLAY_IMMEDIATELY)
 	{
-		g_messageBox.lock(); // Dialog list should not change.
+		m_world->lock(); // Dialog list should not change.
+		onInit();
 		CdialogEvent::Instance()->lock();
 
 		onClearScreen();
 		onPaintButtons();
 		onPaint();
+		if (m_render_after_paint)
+		{
+			onRender();
+		}
 		onDisplay();
 
 		CdialogEvent::Instance()->unlock();
-		g_messageBox.unlock();
+		m_world->unlock();
 	}
 }
 
 CmessageBox::~CmessageBox()
 {
-	if(D)Log.write("begin CmessageBox::~CmessageBox %s", m_name.c_str() );
+	//("begin CmessageBox::~CmessageBox %s", m_name.c_str() );
 	if ( m_push ==true)
 	{
-		unregisterMessageBox();
+		m_world->unregisterMessageBox(this);
 		m_push =false;
 	}
-	if(D)Log.write("end CmessageBox::~CmessageBox");
+	//("end CmessageBox::~CmessageBox");
 }
 
+/** @brief Init the message box
+ *  @return true on success
+ */
 bool CmessageBox::onInit()
 {
+	int x=m_rect.right()-Cgraphics::m_defaults.button_height*2-2;
+	int y=m_rect.bottom()-Cgraphics::m_defaults.button_height-1;
+
+	switch ( m_flags & MB_STYLE)
+	{
+	case MB_OK:
+		m_ok.m_rect.setPosition( Cpoint(x,y));
+		m_graphics->setCode( m_ok.m_rect.offset(0,0,Cgraphics::m_defaults.button_height*2+1,Cgraphics::m_defaults.button_height), KEY_CR);
+		x=x-Cgraphics::m_defaults.button_height*2-1;
+		break;
+
+	case MB_QUIT_OK:
+		m_ok.m_rect.setPosition( Cpoint(x,y));
+		m_graphics->setCode( m_ok.m_rect.offset(0,0,Cgraphics::m_defaults.button_height*2+1,Cgraphics::m_defaults.button_height), KEY_CR);
+		x=x-2*Cgraphics::m_defaults.button_height-1;
+		m_cancel.m_rect.setPosition( Cpoint(x,y));
+		m_graphics->setCode( m_ok.m_rect.offset(0,0,Cgraphics::m_defaults.button_height*2+1,Cgraphics::m_defaults.button_height), KEY_ESCAPE);
+		x=x-Cgraphics::m_defaults.button_height*2-1;
+		break;
+
+	case MB_QUIT:
+		m_cancel.m_rect.setPosition( Cpoint(x,y));
+		m_graphics->setCode( m_ok.m_rect.offset(0,0,Cgraphics::m_defaults.button_height*2+1,Cgraphics::m_defaults.button_height), KEY_ESCAPE);
+		x=x-Cgraphics::m_defaults.button_height*2-1;
+		break;
+	}
 	return true;
 }
 
@@ -416,14 +531,17 @@ void CmessageBox::onUpdate()
 {
 }
 
+/** @brief Clear the dialog content before sending to the screen
+ */
 void CmessageBox::onClearScreen()
 {
-	DarkenAT( m_rect.left()+2, m_rect.top()+2, m_rect.width(), m_rect.height());
-    Cbackground( NULL, m_rect, KEY_NONE, COLOUR("COLOUR_MESSAGEBOX_BACKGROUND2"),
-    		     0, FILL_GRADIENT, COLOUR("COLOUR_MESSAGEBOX_BACKGROUND1")).onPaint(0);
+	graphics()->darken( 8*(m_rect.left()+2), 8*(m_rect.top()+2),
+			             8*m_rect.width(), 8*m_rect.height());
+    Cbackground( NULL, m_rect, KEY_NONE, Cgraphics::m_defaults.messagebox_background2,
+    		     0, FILL_GRADIENT, Cgraphics::m_defaults.messagebox_background1).onPaint(0);
     Egravity gravity =(m_flags&MB_TEXT_CENTER) ? GRAVITY_CENTER:GRAVITY_LEFT;
     Ctext( this, m_rect, KEY_NONE, (Sfont)CtextFont("msb_box"), m_text,
-    		COLOUR("COLOUR_MESSAGEBOX_TEXT"), gravity).onPaint(0);
+    		Cgraphics::m_defaults.messagebox_text, gravity).onPaint(0);
 }
 
 /*============================================================================*/
@@ -437,43 +555,50 @@ void CmessageBox::onClearScreen()
 /*============================================================================*/
 void CmessageBox::onPaint()
 {
+	int btn1 =Cgraphics::m_defaults.button_height;
     //int big =(m_flags & MB_BIG ) ? BIG:0;
-	m_ok.setImage(ICON_OK_TEXT48, GRAVITY_CENTER);
-	m_cancel.setImage(ICON_ESC_TEXT48, GRAVITY_CENTER);
-	int x=m_rect.right();
- 	if ( m_flags & MB_PRINTER_READY)
+	if ( m_flags & MB_PRINTER_READY)
 	{
-		imageAT( ICON_PRINTER48, m_rect.left(), m_rect.top(), m_rect.left()+6, m_rect.top()+6);
-		CcalculatorButton( Crect( m_rect.left()+6, m_rect.top(), m_rect.left()+12, m_rect.top()+6),
+		graphics()->image( Cgraphics::m_defaults.icon_printer48,
+				 m_rect.left()*8, m_rect.top()*8, (m_rect.left()+btn1)*8, (m_rect.top()+btn1)*8);
+		CcalculatorButton( Crect( m_rect.left()+btn1, m_rect.top(), m_rect.left()+btn1*2, m_rect.top()+btn1),
 			               "ok", KEY_NONE);
 	}
 	if ( m_flags & MB_PRINTING)
 	{
-		imageAT( ICON_PRINTER48, m_rect.left(), m_rect.top(), m_rect.left()+6, m_rect.top()+6);
+		graphics()->image( Cgraphics::m_defaults.icon_printer48,
+				            m_rect.left()*8, m_rect.top()*8, (m_rect.left()+btn1)*8,btn1*8);
 	}
-	switch ( m_flags & MB_STYLE)
-	{
-	case MB_OK:
-		m_ok.onPaint( Cpoint( m_rect.right()-1-m_ok.m_rect.width(), m_rect.bottom()-7), NO_TOUCH);
-		break;
-
-	case MB_QUIT_OK:
-		m_ok.onPaint( Cpoint( m_rect.right()-2-m_ok.m_rect.width(), m_rect.bottom()-7), NO_TOUCH);
-		m_cancel.onPaint( Cpoint( m_rect.right()-1-m_ok.m_rect.width()-m_cancel.m_rect.width(), m_rect.bottom()-7), NO_TOUCH);
-		break;
-
-	case MB_QUIT:
-		m_cancel.onPaint( Cpoint( m_rect.right()-1-m_ok.m_rect.width(), m_rect.bottom()-7), 0);
-		break;
-
-	case MB_WAITER_MANAGER:
-		CimageButton( Crect( x + 2, m_rect.bottom()-7, 13, 6), KEY_W, _WAITER, ICON_VLOER17).onPaint(0);
-		CimageButton( Crect( x + 17, m_rect.bottom()-7, 13, 6), KEY_M, _MANAGER, ICON_VLOER17).onPaint(0);
-		break;
-	}
+//	switch ( m_flags & MB_STYLE)
+//	{
+//	case MB_OK:
+//		m_graphics->setCode( m_ok.m_rect.offset(0,0,13,6), KEY_CR);
+//		m_ok.onPaint( Cpoint( m_rect.right()-1-m_ok.m_rect.width(), m_rect.bottom()-7), NO_TOUCH);
+//		break;
+//
+//	case MB_QUIT_OK:
+//		m_graphics->setCode( m_ok.m_rect.offset(0,0,13,6), KEY_CR);
+//		m_ok.m_rect.setPosition( Cpoint( m_rect.right-2-m_ok.m_rect.width(), m_rect.bottom()-7));
+//		m_cancel.m_rect.setPosition( m_ok.m_rect.m_origin-Cpoint(13,0));
+//		m_graphics->setCode( m_ok.m_rect, KEY_CR);
+//		m_graphics->setCode( m_cancel.m_rect, KEY_ESCAPE);
+//		m_ok->onPaint(0);
+//		m_cancel->onPaint(0);
+//		break;
+//
+//	case MB_QUIT:
+//		m_graphics->setCode( m_cancel.m_rect.offset(0,0,13,6), KEY_CR);
+//		m_cancel.onPaint( Cpoint( m_rect.right()-1-m_ok.m_rect.width(), m_rect.bottom()-7), 0);
+//		break;
+//	}
 }
 
-Estatus CmessageBox::onButton( SDLMod mod, keybutton sym)
+/** @brief Handle key events
+ *  @param mod [in] Shift, Space, Ctrl and other main keys
+ *  @param sym [in] The real symbol picked
+ *  @return Return status, to see if the event was handled. If not it is sent to parents, brothers etc.
+ */
+Estatus CmessageBox::onButton( keymode mod, keybutton sym)
 {
 	(void)mod;
 	Ctimestamp d;
@@ -516,7 +641,9 @@ Estatus CmessageBox::onButton( SDLMod mod, keybutton sym)
 	return DIALOG_EVENT_PROCESSED;
 }
 
-
+/** @brief Regularly called function during the mailbox
+ *  @return true on success
+ */
 bool CmessageBox::onLoop()
 {
 	if ( m_flags & (MB_TIME1|MB_TIME2|MB_TIME3|MB_TIME5|MB_TIME10))
@@ -531,6 +658,7 @@ bool CmessageBox::onLoop()
 	return m_alive;
 }
 
+/** @brief Exit function for the dialog */
 void CmessageBox::onExit()
 {
 	if (m_flags & MB_RETURN)
@@ -539,20 +667,22 @@ void CmessageBox::onExit()
 	}
 }
 
+/** @brief Called to clear all variables after closing the dialog */
 void CmessageBox::onCleanup()
 {
 	if ( m_push)
 	{
-		unregisterMessageBox();
+		m_world->unregisterMessageBox(this);
 	}
 }
 
+/** @brief Clear the dialog at the end of the software, exit software */
 void CmessageBox::clear()
 {
 	if ( m_push ==true)
 	{
 		//pollScreen();
-		unregisterMessageBox();
+		m_world->unregisterMessageBox(this);
 		m_push =false;
 	}
 }

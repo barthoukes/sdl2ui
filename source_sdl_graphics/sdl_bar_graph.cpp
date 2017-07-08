@@ -1,6 +1,6 @@
 /*============================================================================*/
 /**  @file       sdl_bar_graph.cpp
- **  @ingroup    zhongcan_sdl
+ **  @ingroup    sdl2ui
  **  @brief		 Default dialog.
  **
  **  Create a bar graph. This is a dialog object, which contains one bar only.
@@ -11,15 +11,31 @@
  **              CbarGraph
  */
 /*------------------------------------------------------------------------------
- **  Copyright (c) Bart Houkes, 28 jan 2011
+ ** Copyright (C) 2011, 2014, 2015
+ ** Houkes Horeca Applications
  **
- **  Copyright notice:
- **  This software is property of Bart Houkes.
- **  Unauthorized duplication and disclosure to third parties is forbidden.
- **============================================================================*/
+ ** This file is part of the SDL2UI Library.  This library is free
+ ** software; you can redistribute it and/or modify it under the
+ ** terms of the GNU General Public License as published by the
+ ** Free Software Foundation; either version 3, or (at your option)
+ ** any later version.
+
+ ** This library is distributed in the hope that it will be useful,
+ ** but WITHOUT ANY WARRANTY; without even the implied warranty of
+ ** MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
+ ** GNU General Public License for more details.
+
+ ** Under Section 7 of GPL version 3, you are granted additional
+ ** permissions described in the GCC Runtime Library Exception, version
+ ** 3.1, as published by the Free Software Foundation.
+
+ ** You should have received a copy of the GNU General Public License and
+ ** a copy of the GCC Runtime Library Exception along with this program;
+ ** see the files COPYING3 and COPYING.RUNTIME respectively.  If not, see
+ ** <http://www.gnu.org/licenses/>
+ **===========================================================================*/
 
 /*------------- Standard includes --------------------------------------------*/
-
 #include "sdl_button.h"
 #include "sdl_bar_graph.h"
 
@@ -126,7 +142,7 @@ void CbarGraph::onPaint( const Crect &rect, int touch)
 	m_graphics->setColour(c);
 	for ( int n=1; n<m_helpLines; n++)
 	{
-		int y=((bottom-top)*n/m_helpLines);
+		int y=(int)((bottom-top)*n/m_helpLines);
 		for ( int x=left; x<right; x+=8)
 		{
 			m_graphics->line( x,y, x+3, y);
@@ -216,10 +232,10 @@ void CbarGraph::onPaint( const Crect &rect, int touch)
 			if ( v!=0)
 			{
 				m_graphics->setColour( c);
-				m_graphics->bar( x1, y1, x2, (int)zero, 0);
+				m_graphics->bar( x1, (int)y1, x2, (int)zero, 0);
 				int d=m_graphics->brighter( c, -15);
 				m_graphics->setColour( d);
-				m_graphics->rectangle( x1, y1, x2, (int)zero, 0);
+				m_graphics->rectangle( x1, (int)y1, x2, (int)zero, 0);
 			}
 		}
 	}
