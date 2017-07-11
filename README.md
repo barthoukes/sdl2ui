@@ -14,3 +14,10 @@ Soon here will be following objects:
 - Messagebox solution
 - Edit text
 - Chinese input method (no, I am not a Chinese)
+
+Build
+=====
+Use Eclipse Oxygen to build all
+First install following for debian distributions:
+sudo apt-get install libzinnia-dev libsdl2-dev libsdl2-image-dev libsdl2-mixer-dev libsdl2-ttf-dev g++
+
