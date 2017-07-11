@@ -1,11 +1,45 @@
-/*
- * sdl_json_object.cpp
- *
- *  Created on: 18 feb. 2014
- *      Author: mensfort
+/*============================================================================*/
+/**  @file       sdl_json_object.cpp
+ **  @ingroup    sdl2ui
+ **  @brief		 Extension with Json
+ **
+ **  Use Json to define buttons, images and all graphical objects.
+ **  Nice to have, but totally not needed, unless we define text files for
+ **  Json. The Json library is changed to accept single quotes also.
+ **
+ **  @author     mensfort
+ **
+ **  @par Classes:
+ **              CjsonObject
  */
+/*------------------------------------------------------------------------------
+ ** Copyright (C) 2011, 2014, 2015
+ ** Houkes Horeca Applications
+ **
+ ** This file is part of the SDL2UI Library.  This library is free
+ ** software; you can redistribute it and/or modify it under the
+ ** terms of the GNU General Public License as published by the
+ ** Free Software Foundation; either version 3, or (at your option)
+ ** any later version.
 
+ ** This library is distributed in the hope that it will be useful,
+ ** but WITHOUT ANY WARRANTY; without even the implied warranty of
+ ** MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
+ ** GNU General Public License for more details.
+
+ ** Under Section 7 of GPL version 3, you are granted additional
+ ** permissions described in the GCC Runtime Library Exception, version
+ ** 3.1, as published by the Free Software Foundation.
+
+ ** You should have received a copy of the GNU General Public License and
+ ** a copy of the GCC Runtime Library Exception along with this program;
+ ** see the files COPYING3 and COPYING.RUNTIME respectively.  If not, see
+ ** <http://www.gnu.org/licenses/>
+ **===========================================================================*/
+
+/*------------- Standard includes --------------------------------------------*/
 #include <ctype.h>
+#include <string>
 #include "sdl_json_object.h"
 
 /** @brief constructor. CdialogObject just for the paint function.
@@ -518,7 +552,7 @@ void CjsonObject::decodeHeaderButton( const Json::Value &root)
 	Crect rect =decodeRect( root);
 	keybutton code =decodeKeybutton( root);
 
-	Egravity gravity=decodeGravity( root, m_buttonGravity);
+	//Egravity gravity=decodeGravity( root, m_buttonGravity);
 	textId id=decodeTextId( root);
 
 	CheaderButton *btn;
