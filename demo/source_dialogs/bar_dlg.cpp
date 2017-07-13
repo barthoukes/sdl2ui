@@ -42,6 +42,28 @@
 #include "font_dlg.h"
 #include "bar_dlg.h"
 #include "lingual.h"
+#include "sdl_swype_dialog.h"
+#include "sdl_bar_graph.h"
+
+Cbars::Cbars(Cdialog *parent)
+: CswypeDialog(parent, Crect(0,6, parent->width(), parent->height()-12), KEY_F1, true)
+{
+}
+
+Cbars::~Cbars() {}
+
+void Cbars::onPaintUnit( int unit, const Crect &location)
+{
+	int value1 = (unit * 30)%1000;
+	int value2 = (unit * 30)%(1000-30-value1);
+	char s[100];
+	sprintf(s, "%d", unit);
+	CbarGraph cb( this, (double)value1, (double)value2, true, (std::string)s, 2, 4, (colour)0x112233);
+//	( Cdialog *parent, double value1, double value2, bool stacked,
+//				   const std::string &text, int spacing, int helplines, colour back);
+	cb.setRange(-10,1000);
+	cb.onPaint(0);
+}
 
 CbarDlg::CbarDlg(Iworld *world)
 : Cdialog( NULL,"CmainDialog", Crect(0,0,0,0), world)
@@ -50,6 +72,7 @@ CbarDlg::CbarDlg(Iworld *world)
 , m_bottom2( this, Crect(m_squares_width*1/4 ,m_squares_height-6, m_squares_width/4, 6), KEY_F2, _EMPTY, "left*.png")
 , m_bottom3( this, Crect(m_squares_width*2/4, m_squares_height-6, m_squares_width/4, 6), KEY_F3, _EMPTY, "right*.png")
 , m_bottom4( this, Crect(m_squares_width*3/4, m_squares_height-6, m_squares_width/4, 6), KEY_F4, _ENTER, "enter*.png")
+, m_graph(this)
 {
 	registerObject( &m_header);
 	registerObject( &m_bottom1);

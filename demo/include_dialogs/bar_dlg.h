@@ -38,7 +38,16 @@
 /*------------- Standard includes --------------------------------------------*/
 #include "sdl_message_box.h"
 #include "sdl_button.h"
+#include "sdl_swype_dialog.h"
 #include "timestamp.h"
+
+class Cbars : public CswypeDialog
+{
+public:
+	Cbars(Cdialog *parent);
+	~Cbars();
+	void onPaintUnit( int unit, const Crect &location);
+};
 
 class CbarDlg : public Cdialog
 {
@@ -62,4 +71,5 @@ private:
 	CbottomButton		m_bottom2; ///< 2nd button
 	CbottomButton		m_bottom3; ///< 3rd button
 	CbottomButton		m_bottom4; ///< 4st button
+	Cbars				m_graph;
 };
