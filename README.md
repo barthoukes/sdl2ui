@@ -1,12 +1,12 @@
 sdl2ui features
 ===============
-SDL2UI can create window GUI applications with UI, buttons, mouse, touch, RFID etc.
-SDL2UI is based on SDL1.2 and later SDL2.0
+  SDL2UI can create window GUI applications with UI, buttons, mouse, touch, RFID etc.
+  SDL2UI is based on SDL1.2 and later SDL2.0
 
 
-The graphical renderer from SDL is used to show output on the display
-Images are reponsive when you touch them. A dark background circle when you press them, which decreases fast when released.
-No use of a big SDL_Surface, but each button is a seperate SDL_Surface, more flexible and easier to change to SDL2.0
+* The graphical renderer from SDL is used to show output on the display
+* Images are reponsive when you touch them. A dark background circle when you press them, which decreases fast when released.
+* No use of a big SDL_Surface, but each button is a seperate SDL_Surface, more flexible and easier to change to SDL2.0
 2D matrix of buttons is possible with soft scroll in verticle or horizontal direction.
 After glow for each button, image, background in different shapes.
 Play audio wave forms automatic
