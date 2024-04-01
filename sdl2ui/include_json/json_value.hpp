@@ -1,9 +1,9 @@
-#ifndef CPPTL_JSON_H_INCLUDED
-# define CPPTL_JSON_H_INCLUDED
+#pragma once
 
-# include "json_forwards.h"
 # include <string>
 # include <vector>
+
+#include "json_forwards.hpp"
 
 # ifndef JSON_USE_CPPTL_SMALLMAP
 #  include <map>
@@ -369,6 +369,7 @@ namespace Json {
       std::string getComment( CommentPlacement placement ) const;
 
       std::string toStyledString() const;
+      std::string toFastString() const;
 
       const_iterator begin() const;
       const_iterator end() const;
@@ -885,7 +886,7 @@ public: // overridden from ValueArrayAllocator
 
       ValueIteratorBase();
 #ifndef JSON_VALUE_USE_INTERNAL_MAP
-      explicit ValueIteratorBase( const Value::ObjectValues::iterator &current );
+      ValueIteratorBase( const Value::ObjectValues::iterator &current );
 #else
       ValueIteratorBase( const ValueInternalArray::IteratorState &state );
       ValueIteratorBase( const ValueInternalMap::IteratorState &state );
@@ -961,7 +962,7 @@ public: // overridden from ValueArrayAllocator
       /*! \internal Use by Value to create an iterator.
        */
 #ifndef JSON_VALUE_USE_INTERNAL_MAP
-      explicit ValueConstIterator( const Value::ObjectValues::iterator &current );
+      ValueConstIterator( const Value::ObjectValues::iterator &current );
 #else
       ValueConstIterator( const ValueInternalArray::IteratorState &state );
       ValueConstIterator( const ValueInternalMap::IteratorState &state );
@@ -1065,5 +1066,3 @@ public: // overridden from ValueArrayAllocator
 
 } // namespace Json
 
-
-#endif // CPPTL_JSON_H_INCLUDED

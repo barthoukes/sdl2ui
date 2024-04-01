@@ -1,7 +1,7 @@
 #ifndef JSON_AUTOLINK_H_INCLUDED
 # define JSON_AUTOLINK_H_INCLUDED
 
-# include "config.h"
+#include "json_config.hpp"
 
 # ifdef JSON_IN_CPPTL
 #  include <cpptl/cpptl_autolink.h>
@@ -13,7 +13,7 @@
 #  ifdef JSON_DLL
 #   define CPPTL_AUTOLINK_DLL
 #  endif
-#  include "autolink.h"
+#  include "json_autolink.hpp"
 # endif
 
 #endif // JSON_AUTOLINK_H_INCLUDED
