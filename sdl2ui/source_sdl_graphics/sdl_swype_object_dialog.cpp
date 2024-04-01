@@ -50,6 +50,7 @@ CswypeObjectDialog::CswypeObjectDialog( Cdialog *parent, const Crect &rect, keyb
 		bool horizontal)
 : CswypeDialog( parent, rect, firstKey, horizontal)
 {
+    (void)span;
 	if ( horizontal)
 	{
 		m_nrFkeys =200;
@@ -68,68 +69,10 @@ CswypeObjectDialog::~CswypeObjectDialog()
  *  @return Item index found in the list. */
 int CswypeObjectDialog::getScrollIndex( keybutton sym)
 {
-//	if ( sym<m_firstKey || sym>m_firstKey+m_nrFkeys-1)
-//	{
-//		return -1;
-//	}
-//	int key =(sym-m_firstKey);
-//	int invisible;
-//	if ( m_horizontal)
-//	{
-//		invisible =m_scroll/(itemBlocks()*8);
-//		//invisible =m_surfacePixels.left()/(itemBlocks()*8)+m_firstRow;
-//	}
-//	else
-//	{
-//		invisible =m_scroll/(itemBlocks()*8);
-//		//invisible =m_surfacePixels.top()/(itemBlocks()*8)+m_firstRow;
-//	}
-//	invisible *=m_span;
-//	int firstKey =(invisible%m_nrFkeys);
-//	int offset =(key-firstKey+m_nrFkeys)%m_nrFkeys+invisible;
-//	return ( offset>=0 && offset<(int)size()) ? offset:-1;
+    (void)sym;
 	return 0;
 }
 
-/** @brief Calculate how many cells we have.
- *  @return Number of cells.
- */
-//size_t CswypeObjectDialog::size()
-//{
-//	return 10;
-//}
-
-/** @brief Calculate number of rows we have.
- *  @return Number of rows.
- */
-//size_t CswypeObjectDialog::rows()
-//{
-//	return (int)((size()+m_span-1)/m_span);
-//}
-
-/** @brief Make sure the item is visible.
- *  @param index [in] Which item we want to see.
- *  @param time [in] Time in milliseconds to arrive at location.
- */
-//void CswypeObjectDialog::makeSureIndexVisible( int index, int time)
-//{
-//	makeSureRowVisible( index/m_span, time);
-//}
-
-/**
- * @brief Calculate rectangle for 1 single item.
- */
-//void CswypeObjectDialog::calculateItemRect()
-//{
-//	if ( m_horizontal)
-//	{
-//		m_itemRect =Crect( 0,0, itemBlocks(), m_rect.height()/m_span);
-//	}
-//	else
-//	{
-//		m_itemRect =Crect( 0,0, m_rect.width()/m_span, itemBlocks());
-//	}
-//}
 
 /** Decide which key in a scroll dialog.
  * 	@param p [in] What position on screen.
@@ -137,6 +80,7 @@ int CswypeObjectDialog::getScrollIndex( keybutton sym)
  */
 keybutton CswypeObjectDialog::findButton( const Cpoint &p)
 {
+    (void)p;
 //	m_dialogSpeed =0;
 //	Cpoint q=p/8;
 //	if ( m_rect.inside( q)==true && m_visible ==true)
@@ -151,7 +95,7 @@ keybutton CswypeObjectDialog::findButton( const Cpoint &p)
 //				return KEY_NONE;
 //			}
 //			keybutton key =(keybutton)(m_firstKey+(item%m_nrFkeys));
-//			Caudio::Instance()->click();
+//			AUDIO_CLICK();
 //			return key;
 //		}
 //		else
@@ -164,7 +108,7 @@ keybutton CswypeObjectDialog::findButton( const Cpoint &p)
 //				return KEY_NONE;
 //			}
 //			keybutton key =(keybutton)(m_firstKey+(item%m_nrFkeys));
-//			Caudio::Instance()->click();
+//			AUDIO_CLICK();
 //			return key;
 //		}
 //	}
@@ -185,10 +129,10 @@ keybutton CswypeObjectDialog::findButton( const Cpoint &p)
  *  @param p [in] Find which object is on that location.
  *  @return Pointer to object. Not re-entrant, please use once.
  */
-CdialogObject * CswypeObjectDialog::findObject( const Cpoint &p)
+CdialogObjectPtr CswypeObjectDialog::findObject( const Cpoint &p)
 {
-	CdialogObject *object =NULL;
-
+	CdialogObjectPtr object;
+    (void)p;
 //	for ( CdialogObject *obj : m_swypeObjects)
 //	{
 //

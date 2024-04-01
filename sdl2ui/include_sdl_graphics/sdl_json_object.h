@@ -32,11 +32,18 @@
 #pragma once
 
 /*------------- Standard includes --------------------------------------------*/
-#include "sdl_button.h"
-#include "sdl_image.h"
-#include "json_value.h"
-#include "json_reader.h"
-#include "json_features.h"
+#include <memory>
+
+#include "sdl_rect.h"
+#include "sdl_font.h"
+#include "sdl_types.h"
+#include "sdl_dialog_object.h"
+#include "json_features.hpp"
+#include "json_reader.hpp"
+#include "json_value.hpp"
+
+class Cbutton;
+class Cimage;
 
 /// Class to get an object from text strings.
 class CjsonObject : public CdialogObject
@@ -48,10 +55,10 @@ public:
 
 	virtual ~CjsonObject();
 
-	operator Cbutton*() const;
-	operator Cimage*() const;
-	CdialogObject *operator[]( int index);
-	CdialogObject *find( keybutton key);
+	//operator CbuttonPtr() const;
+	//operator CimagePtr() const;
+	CdialogObjectPtr operator[]( int index);
+	CdialogObjectPtr find( keybutton key);
 	void add( const std::string &description);
 
 private:
@@ -85,7 +92,7 @@ private:
 	Json::Reader 	m_reader;		///< Needed for parsing json.
 	Json::Value 	m_root;			///< Needed for parsing json.
 	int				m_index;		///< Which object we want.
-	std::vector<CdialogObject*> m_object;	///< List of objects.
+	std::vector<CdialogObjectPtr> m_object;	///< List of objects.
 
 private:
 	std::string		m_lastName;		///< Last name for next button
@@ -111,5 +118,7 @@ private:
 	EfillType		m_lastBackgroundFill; ///< Fill type
 	int				m_lastButtonRadius; ///< Radius calculate
 };
+
+typedef std::shared_ptr<CjsonObject> CjsonObjectPtr;
 
 /* SDL_JSON_OBJECT_H_ */

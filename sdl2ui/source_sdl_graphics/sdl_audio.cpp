@@ -5,7 +5,9 @@
  **
  **  Create sound without stopping the CPU.
  **
- **  @author     mensfort
+ **  @author .
+ **
+ **      mensfort
  **
  **  @par Classes:
  **              Caudio
@@ -38,6 +40,9 @@
 /*------------- Standard includes --------------------------------------------*/
 #include "sdl_audio.h"
 
+/// Main layer on bottom, closed as last in the program.
+Caudio *m_mainAudio =NULL;
+
 /** @brief Constructor audio */
 Caudio::Caudio()
 : m_ready(false)
@@ -66,7 +71,6 @@ Caudio::~Caudio()
 	{
 		Mix_HaltChannel(channel);
 		Mix_FreeChunk(sound);
-		Mix_CloseAudio();
 		sound =NULL;
 		channel =-1;
 	}

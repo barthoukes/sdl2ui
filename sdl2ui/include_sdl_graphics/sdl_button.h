@@ -38,14 +38,16 @@
 #pragma once
 
 /*------------- Standard includes --------------------------------------------*/
+#include <memory>
 #include <string>
-#include "sdl_keybutton.h"
-#include "sdl_graphics.h"
-#include "sdl_dialog_object.h"
-#include "sdl_rectangle.h"
+#include "lingual.h"
 #include "sdl_text.h"
 #include "sdl_label.h"
 #include "sdl_image.h"
+#include "sdl_graphics.h"
+#include "sdl_keybutton.h"
+#include "sdl_rectangle.h"
+#include "sdl_dialog_object.h"
 
 /// @brief  Forward declaration.
 class Cdialog;
@@ -92,26 +94,28 @@ public:
 	virtual void onPaint( int touch);
 	virtual void onPaint( const std::string &text, int touch);
 	void	setText( const std::string &text);
-	void 	setText( textId id);
-	std::string getText();
+	void 	setTextId( textId id);
+	std::string getText() const;
+	textId  getTextId() const;
 	void 	setInfoText( const std::string &text);
-	void 	setImage( const std::string &image, Egravity horizontal=GRAVITY_NO_CHANGE);
+	void 	setImage( const std::string &image, Egravity horizontal=GRAVITY_NO_CHANGE, int size=-1);
+	void    noImage() { m_image.clear(); }
 	void    setTop( int y) { m_rect.setTop(y); }
+	void    setTextColour( colour text);
 	void	setColours( colour text, colour background1 =COLOUR_BLACK, colour background2=COLOUR_DARKGRAY);
 	void 	setBorderColours( colour b1, colour b2=-1);
 	void	setBackgroundColour( colour background, colour background2=COLOUR_DARKGRAY);
 	void	setBorder( EborderType border, int radius =0);
-	void    setSpacing( int spacing) { m_spacing =spacing; }
-	void    setImageGravity( Egravity gravity) { m_image.setGravity( gravity); }
-	void    setTextGravity( Egravity text) { if (m_textButton) m_textButton->setGravity( text); }
+	void    setSpacing( int spacing);
+	void    setImageGravity( Egravity gravity);
+	void    setTextGravity( Egravity text);
 	void	setFillType( EfillType fill =FILL_UNICOLOURED);
-    void    setFont( const Sfont &font) { if ( m_textButton) m_textButton->setFont( font); }
-	void    enableBackground() { m_noBackground=false; }
-	void    disableBackground() { m_noBackground =true; }
-	void 	roundedRectangle( int radius)
-	{
-		m_background.setRadius( radius);
-	}
+    void    setFont( const Sfont &font);
+	void    enableBackground();
+	void    disableBackground();
+	void 	roundedRectangle( int radius);
+	void    decrease(int width, int height);
+	void    setGreyedOut( bool grey);
 	void	noLabel() { m_label.setText(""); }
 	void    setMargin( int hor, int ver) { m_horizontal_margin =hor; m_vertical_margin=ver; }
 	void    setLabel( const std::string &label)
@@ -140,8 +144,10 @@ public:
 	{
 		m_label.setRect(rect); m_background.setRect(rect);
 		if ( m_textButton) m_textButton->setRect(rect);
+		m_image.setRect(rect);
 		CdialogObject::setRect( rect);
 	}
+    void addLeft( int left);
 	void setVisible( bool visible)
 	{
 		m_label.setVisible(visible); m_background.setVisible(visible);
@@ -163,14 +169,17 @@ private:
 	void	paintLabel();
 	void	paintCross();
 	void    paintImage();
+	Sfont   calculateFont( const std::string &text);
+
+public:
+	bool				m_noBackground; ///< No background.
+	Cbackground			m_background;	///< Square inside.
 
 protected:
-	Cbackground			m_background;	///< Square inside.
 	Cimage				m_image;		///< Image.
 	Clabel		 		m_label;	///< Label for the button.
 	std::string			m_text;		///< Text to show.
 	colour		 		m_textColour; ///< Colour text. Almost obsolete.
-	bool				m_noBackground; ///< No background.
 	EborderType			m_border;	///< Border.
 	bool				m_cross;	///< Cross.
 	textId				m_textId;	///< Text by id.
@@ -178,7 +187,7 @@ protected:
 	colour			 	m_border1;	///< Border colour 1.
 	colour			 	m_border2;	///< Border colour 2.
 	bool				m_alignBottom;	///< Bottom alignment.
-	Ctext				*m_textButton; ///< Text button to use.
+	CtextPtr            m_textButton; ///< Text button to use.
 	int					m_style;		///< Style for the button.
 	int					m_horizontal_margin; ///< Margin.
 	int					m_vertical_margin; ///< Margin.
@@ -187,6 +196,7 @@ protected:
 	colour				m_button_shadow; ///< shadow button.
 	int					m_imageSize; ///< Size of image.
 	Egravity			m_imageGravity; ///< Gravity image.
+	bool				m_greyedOut; ///< Are we invalid?
 };
 
 
@@ -201,7 +211,9 @@ public:
 	CmenuButton( const Crect &rect,
 					 keybutton key,
 				     const std::string &text,
-				     const std::string &icon="");public:
+				     const std::string &icon="");
+
+public:
 	~CmenuButton() {}
 };
 
@@ -287,7 +299,7 @@ public:
 	CmatrixButton( Cdialog *parent,
 			       const Crect &rect,
 			       textId id,
-			       keybutton key);
+			       keybutton key = KEY_NOCHANGE);
 	CmatrixButton( Cdialog *parent,
 			       const Crect &rect,
 			       const std::string &s,
@@ -308,6 +320,9 @@ class CcalculatorButton : public Cbutton
 public:
 	CcalculatorButton( const Crect &rect,
 			       const std::string &s,
+	   	   	       keybutton key);
+	CcalculatorButton( const Crect &rect,
+			       EtextId id,
 	   	   	       keybutton key);
 	CcalculatorButton( const Crect &rect,
 			       const std::string &s,
@@ -338,6 +353,7 @@ public:
 			     const Crect &rect,
 			     keybutton key,
 			     textId id,
+				 const std::string &image,
 			     colour col=-1);
 public:
 	virtual ~CfunctionButton() {}
@@ -365,3 +381,14 @@ public:
 public:
 	virtual ~CiconButton() {}
 };
+
+typedef std::shared_ptr<Cbutton> CbuttonPtr;
+typedef std::shared_ptr<CmenuButton> CmenuButtonPtr;
+typedef std::shared_ptr<CtextButton> CtextButtonPtr;
+typedef std::shared_ptr<CimageButton> CimageButtonPtr;
+typedef std::shared_ptr<CbottomButton> CbottomButtonPtr;
+typedef std::shared_ptr<CheaderButton> CheaderButtonPtr;
+typedef std::shared_ptr<CmatrixButton> CmatrixButtonPtr;
+typedef std::shared_ptr<CfunctionButton> CfunctionButtonPtr;
+typedef std::shared_ptr<CkeyboardButton> CkeyboardButtonPtr;
+typedef std::shared_ptr<CcalculatorButton> CcalculatorButtonPtr;

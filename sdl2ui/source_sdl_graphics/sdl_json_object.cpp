@@ -40,7 +40,13 @@
 /*------------- Standard includes --------------------------------------------*/
 #include <ctype.h>
 #include <string>
+#include "sdl_text.h"
+#include "sdl_types.h"
+#include "sdl_image.h"
+#include "sdl_button.h"
+#include "sdl_graphics.h"
 #include "sdl_json_object.h"
+#include "sdl_dialog_object.h"
 
 /** @brief constructor. CdialogObject just for the paint function.
  *  @param parent [in] Dialog to use this object
@@ -52,7 +58,6 @@
  *  <li>calculatorbutton 'rect'=[left,top,width,height], 'code'='<key>', 'text'='<text>'
  *  <li>background 'rect'=[left,top,width,height], 'radius'=N, 'fill'='<fill>, 'colour1'='<colour>', 'colour2'='<colour', 'icon'='<background_image>', 'border'=P
  *  <li>text 'rect'=[left,top,width,height],
- *
  */
 CjsonObject::CjsonObject( Cdialog *parent, const std::string &description)
 : CdialogObject( parent, Crect(0,0,0,0), KEY_NONE)
@@ -99,12 +104,12 @@ void CjsonObject::add( const std::string &description)
 	{
 		for ( int n=0; n<(int)m_root.size(); n++)
 		{
-			decode( m_parent, m_root[n]);
+			decode( m_pParent, m_root[n]);
 		}
 	}
 	else
 	{
-		decode( m_parent, m_root);
+		decode( m_pParent, m_root);
 	}
 }
 
@@ -163,7 +168,8 @@ void CjsonObject::decodeImage( Cdialog *parent, const Json::Value &root)
 	int margin =decodeMargin( root);
 	m_lastLabel ="";
 	std::string label =decodeLabel( root);
-	Cimage *img =new Cimage( parent, rect, code, icon, border, margin, label);
+	CimagePtr img =std::make_shared<Cimage>( parent, rect, code, icon, border, margin);
+	img->setLabel(label);
 	Json::Value v=root["gravity"];
 	if ( v.isString())
 	{
@@ -443,8 +449,10 @@ void CjsonObject::decodeText( Cdialog *parent, const Json::Value &root)
 	Egravity gravity =decodeGravity( root, m_buttonGravity);
 	int cursor =-1;
 	int cursorColour =0;
-	Ctext *txtObj =new Ctext( parent, rect, code, (Sfont)CtextFont(fontName.c_str()),
-			                  txt, colour, gravity, cursor, cursorColour);
+	CtextPtr txtObj =std::make_shared<Ctext>( parent, rect, code,
+			                  (Sfont)CtextFont(fontName.c_str()),
+			                  txt,
+							  colour, gravity, cursor, cursorColour);
 	m_object.push_back( txtObj);
 }
 
@@ -481,8 +489,12 @@ Egravity CjsonObject::decodeGravity( const Json::Value &value, Egravity &gravity
 		}
 		else if ( s.compare("left_top")==0)
 		{
-			gravity =GRAVITY_LEFT;
+			gravity =GRAVITY_LEFT_TOP;
 		}
+        else if ( s.compare("left")==0)
+        {
+            gravity =GRAVITY_LEFT;
+        }
 		else if ( s.compare("top_center")==0)
 		{
 			gravity =GRAVITY_TOP_CENTER;
@@ -495,7 +507,11 @@ Egravity CjsonObject::decodeGravity( const Json::Value &value, Egravity &gravity
 		{
 			gravity =GRAVITY_RIGHT_BOTTOM;
 		}
-		else if ( s.compare("right_top")==0)
+        else if ( s.compare("right_top")==0)
+        {
+            gravity =GRAVITY_RIGHT_TOP;
+        }
+		else if ( s.compare("right_center")==0)
 		{
 			gravity =GRAVITY_RIGHT;
 		}
@@ -527,10 +543,10 @@ void CjsonObject::decodeButton( Cdialog *parent, const Json::Value &root)
 
 	EfillType fill =decodeFillType( root, m_lastButtonFill); // default =FILL_UNICOLOURED
 
-	Cbutton *btn;
+	CbuttonPtr btn;
 	if ( id !=INVALID_TEXT_ID && id>=0)
 	{
-		btn =new Cbutton( parent, rect, code, font, id, border, gravity, radius, fill);
+		btn =std::make_shared<Cbutton>( parent, rect, code, font, id, border, gravity, radius, fill);
 	}
 	else
 	{
@@ -540,7 +556,7 @@ void CjsonObject::decodeButton( Cdialog *parent, const Json::Value &root)
 		{
 			txt =v.asString();
 		}
-		btn =new Cbutton( parent, rect, code, font, txt, border, gravity, radius, fill);
+		btn =std::make_shared<Cbutton>( parent, rect, code, font, txt, border, gravity, radius, fill);
 	}
 	Json::Value v =root["label"];
 	if ( v.isString())
@@ -562,12 +578,12 @@ void CjsonObject::decodeHeaderButton( const Json::Value &root)
 	keybutton code =decodeKeybutton( root);
 
 	//Egravity gravity=decodeGravity( root, m_buttonGravity);
-	textId id=decodeTextId( root);
+	textId id = decodeTextId( root);
 
-	CheaderButton *btn;
+	CheaderButtonPtr btn;
 	if ( id !=INVALID_TEXT_ID && id>=0)
 	{
-		btn =new CheaderButton( rect, id, code);
+		btn =std::make_shared<CheaderButton>( rect, id, code);
 	}
 	else
 	{
@@ -577,7 +593,7 @@ void CjsonObject::decodeHeaderButton( const Json::Value &root)
 		{
 			txt =v.asString();
 		}
-		btn =new CheaderButton( rect, txt, code);
+		btn =std::make_shared<CheaderButton>( rect, txt, code);
 	}
 	m_object.push_back( btn);
 }
@@ -587,13 +603,13 @@ void CjsonObject::decodeBottomButton( Cdialog *parent, const Json::Value &root)
 	Crect rect =decodeRect( root);
 	keybutton code =decodeKeybutton( root);
 
-	CbottomButton *btn;
+	CbottomButtonPtr btn;
 	textId id=decodeTextId( root);
 	std::string icon =decodeIcon( root);
 
 	if ( id !=INVALID_TEXT_ID && id>=0)
 	{
-		btn =new CbottomButton( parent, rect, code, id, icon);
+		btn =std::make_shared<CbottomButton>( parent, rect, code, id, icon);
 	}
 	else
 	{
@@ -603,7 +619,7 @@ void CjsonObject::decodeBottomButton( Cdialog *parent, const Json::Value &root)
 		{
 			txt =v.asString();
 		}
-		btn =new CbottomButton( parent, rect, code, txt, icon);
+		btn =std::make_shared<CbottomButton>( parent, rect, code, txt, icon);
 	}
 	if ( btn !=NULL)
 	{
@@ -637,7 +653,7 @@ void CjsonObject::decodeCalculatorButton( const Json::Value &root)
 	Crect rect =decodeRect( root);
 	keybutton code =decodeKeybutton( root);
 
-	CcalculatorButton *btn;
+	CcalculatorButtonPtr btn;
 	std::string txt;
 	Json::Value v =root["text"];
 	if ( v.isString())
@@ -645,8 +661,8 @@ void CjsonObject::decodeCalculatorButton( const Json::Value &root)
 		txt =v.asString();
 	}
 
-	btn =new CcalculatorButton( rect, txt, code);
-	if ( btn !=NULL)
+	btn =std::make_shared<CcalculatorButton>( rect, txt, code);
+	if ( btn.get())
 	{
 		m_object.push_back( btn);
 	}
@@ -659,13 +675,14 @@ void CjsonObject::decodeCalculatorButton( const Json::Value &root)
  */
 void CjsonObject::decodeBackground( Cdialog *parent, const Json::Value &root)
 {
+	(void)parent;
 	Crect rect =decodeRect( root);
 	keybutton code =decodeKeybutton( root);
 	colour colour1 =decodeColour1( root);
 	colour colour2 =decodeColour2( root);
 	int radius =decodeRadius( root, m_lastBackgroundRadius);
 	EfillType fill =decodeFillType( root, m_lastBackgroundFill);
-	Cbackground *back =new Cbackground( parent, rect, code, colour1, radius, fill, colour2);
+	CbackgroundPtr back =std::make_shared<Cbackground>( parent, rect, code, colour1, radius, fill, colour2);
 	if ( fill ==FILL_IMAGE)
 	{
 		std::string image =decodeIcon( root);
@@ -681,10 +698,6 @@ void CjsonObject::decodeBackground( Cdialog *parent, const Json::Value &root)
 
 CjsonObject::~CjsonObject()
 {
-	for ( int n=0; n<(int)m_object.size(); n++)
-	{
-		delete m_object[n];
-	}
 	m_object.clear();
 }
 
@@ -702,21 +715,21 @@ void CjsonObject::onPaint( int touch)
  */
 void CjsonObject::onPaint( const Cpoint &p, int touch)
 {
-	CdialogObject *c;
+	CdialogObjectPtr c;
 	for ( int n=0; n<(int)m_object.size(); n++)
 	{
 		c =m_object[n];
-		c->onPaint( c->m_rect.origin()+p, touch);
+		c->onPaint( c->origin()+p, touch);
 	}
 }
 
-CdialogObject *CjsonObject::find( keybutton key)
+CdialogObjectPtr CjsonObject::find( keybutton key)
 {
-	CdialogObject *c;
+	CdialogObjectPtr c;
 	for ( int n=0; n<(int)m_object.size(); n++)
 	{
 		c =m_object[n];
-		if ( c->m_code ==key)
+		if ( c->getObjectKey() ==key)
 		{
 			return c;
 		}
@@ -724,7 +737,7 @@ CdialogObject *CjsonObject::find( keybutton key)
 	return NULL;
 }
 
-CdialogObject *CjsonObject::operator[]( int index)
+CdialogObjectPtr CjsonObject::operator[]( int index)
 {
 	if ( (int)m_object.size()>index && index>=0)
 	{
@@ -733,12 +746,12 @@ CdialogObject *CjsonObject::operator[]( int index)
 	return NULL;
 }
 
-CjsonObject::operator Cbutton*() const
-{
-	return dynamic_cast<Cbutton*>(m_object[m_index]);
-}
-
-CjsonObject::operator Cimage*() const
-{
-	return dynamic_cast<Cimage*>(m_object[m_index]);
-}
+//CjsonObject::operator CbuttonPtr() const
+//{
+//	return dynamic_cast<CbuttonPtr>(m_object[m_index]);
+//}
+//
+//CjsonObject::operator CimagePtr() const
+//{
+//	return dynamic_cast<CimagePtr>(m_object[m_index]);
+//}

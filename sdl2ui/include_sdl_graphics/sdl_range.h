@@ -35,8 +35,8 @@
 #pragma once
 
 /*------------- Standard includes --------------------------------------------*/
-#include <stddef.h>
 #include <vector>
+
 template<typename T>
 class Crange
 {

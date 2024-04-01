@@ -38,7 +38,10 @@
 #pragma once
 
 /*------------- Standard includes --------------------------------------------*/
+#include <map>
 #include <string>
+#include <memory>
+
 #include "sdl_graphics.h"
 #include "sdl_dialog_object.h"
 #include "sdl_rectangle.h"
@@ -49,7 +52,10 @@
 typedef enum
 {
 	IMAGE_DEFAULT,
-	IMAGE_COLOUR,
+	IMAGE_MONO_COLOUR,
+	IMAGE_CANCEL_COLOUR,
+	IMAGE_OK_COLOUR,
+	IMAGE_BACKGROUND_COLOUR,
 	IMAGE_INVERSE_COLOUR
 } EimageStyle;
 
@@ -61,13 +67,14 @@ class Cimage : public CdialogObject
 {
 public:
 	Cimage( Cdialog *parent, const Crect &rect, keybutton code, const std::string &icon,
-			EborderType border=BORDER_NONE, int margin=0, const std::string &label="");
+			EborderType border=BORDER_NONE, int margin=0);
 	void setLabel( const std::string &label);
 	virtual ~Cimage();
 
 public:
 	void	onPaint( int touch);
 	void    close();
+	void    clear();
 	void 	setImage( const std::string &image, Egravity horizontal, int variable_size=-1);
 	std::string getImage() { return m_image; }
 	void	setBackgroundColour( colour background, int radius=0);
@@ -79,6 +86,7 @@ public:
 	void    setGravity( Egravity horizontal);
 	void    setStyle( EimageStyle style, colour col);
 	Egravity gravity() { return m_imageAlign; }
+    virtual void setRect( const Crect &rect);
 
 private:
 	void 	paintBackground( int touch);
@@ -89,8 +97,8 @@ private:
 	Egravity			m_imageAlign; ///< Align of image.
 	std::string			m_image;	///< Image name.
 	std::string			m_press;    ///< Image when pressed.
-	Cdialog				*m_parent;	///< Parent dialog for the icon.
 public:
+	Cdialog				*m_parent;	///< Parent dialog for the icon.
 	bool				m_noBackground; ///< No background.
 private:
 	EborderType			m_border;	///< Border.
@@ -100,11 +108,15 @@ private:
 	Clabel				m_label;    ///< Label to use.
 	std::string 		m_path; 	///< Path for image.
 	Csize				m_size; 	///< Real size
+	static const        std::map<std::string, EimageStyle> m_monoImages;
+
 protected:
-	sdlTexture			*m_surface; ///< Surface to use if no image.
+	SDL_Surface			*m_surface; ///< Surface to use if no image.
 	Cbackground			m_background; ///< My background.
 	EimageStyle			m_imageStyle; ///< What style we want
 	colour				m_imageColour; ///< For certain styles
 	std::string			m_imagePattern; ///< For certain styles
 };
+
+typedef std::shared_ptr<Cimage> CimagePtr;
 

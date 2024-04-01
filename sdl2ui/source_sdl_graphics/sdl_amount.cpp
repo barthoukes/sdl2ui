@@ -49,7 +49,7 @@
 /// @param height [in] Position.
 ///
 /*============================================================================*/
-Camount::Camount( Cdialog *parent, const Crect &rect, keybutton code, const Sfont &font,
+CamountButton::CamountButton( Cdialog *parent, const Crect &rect, keybutton code, const Sfont &font,
 		   const Cmoney &amount, colour text)
 : Cbutton( parent, rect, code, (Sfont)CtextFont("amounts"), (std::string)amount,
 		   BORDER_NONE, GRAVITY_RIGHT_CENTER)
@@ -67,16 +67,16 @@ Camount::Camount( Cdialog *parent, const Crect &rect, keybutton code, const Sfon
 /// @param value [in] Amount to display.
 ///
 /*============================================================================*/
-Camount::Camount( Cdialog *parent, const Crect &rect, const Cmoney &amount)
+CamountButton::CamountButton( Cdialog *parent, const Crect &rect, const Cmoney &amount)
 : Cbutton( parent, rect, KEY_NONE, (Sfont)CtextFont("amounts"), (std::string)amount,
 		   BORDER_NONE, GRAVITY_RIGHT_CENTER)
 {
 	roundedRectangle(0);
 }
 
-Camount::~Camount() {}
+CamountButton::~CamountButton() {}
 
-void Camount::setAmount( const Cmoney &amount)
+void CamountButton::setAmount( const Cmoney &amount)
 {
 	setText( (std::string)amount);
 }

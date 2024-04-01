@@ -36,21 +36,20 @@
  **===========================================================================*/
 
 /*------------- Standard includes --------------------------------------------*/
-#include "sdl_swype_dialog.h"
+#include "sdl_audio.h"
 #include "sdl_surface.h"
 #include "sdl_graphics.h"
+#include "sdl_swype_dialog.h"
 
+/*----------------------------------------------------------------------------*/
 /** Dialog to scroll objects left-right or up-down */
 CswypeDialog::CswypeDialog( Cdialog *parent, const Crect &rect, keybutton firstKey, bool horizontal)
 : Cdialog( parent, "scrollRect", rect)
 , m_itemRect( 0,0,rect.width(),itemBlocks())
 , m_listSize(0)
-, m_horizontal(horizontal)
 , m_sizes(0)
-, m_scroll(0)
+, m_scrollPosition(0)
 , m_speed(0.0f)
-, m_validBuffers(0)
-, m_visibleBuffers(0)
 , m_firstUnitPainted(0)
 , m_lastUnitPainted(0)
 , m_firstVisibleUnit(0)
@@ -61,6 +60,7 @@ CswypeDialog::CswypeDialog( Cdialog *parent, const Crect &rect, keybutton firstK
 , m_nrFkeys((firstKey==KEY_F1) ? 12:16)
 , m_firstKey(firstKey)
 , m_endMargin(0)
+, m_horizontal(horizontal)
 , m_itemBlocks( 6)
 , m_startPosition(0)
 , m_endPosition(0)
@@ -71,28 +71,45 @@ CswypeDialog::CswypeDialog( Cdialog *parent, const Crect &rect, keybutton firstK
 , m_dragIndex(0)
 , m_object(NULL)
 , m_cursor(0)
+, m_lowPrioCount(0)
 {
-	m_object =new CscrollObject( this, 0, Csize(m_rect.width(), itemBlocks()));
+	m_object =std::make_shared<CscrollObject>( this, 0, Csize(m_rect.width(), itemBlocks()));
 
-	m_graphics =parent->graphics();
+	if ( m_graphics !=NULL && m_isOwner ==true)
+	{
+		delete m_graphics;
+		m_isOwner =false;
+	}
+	m_graphics =m_mainGraph;
 	m_listSize =(3*m_rect.height())/itemBlocks();
-	calculateSurfacePosition();
 	setRect( rect);
+	calculateItemRect();
 }
 
+/*----------------------------------------------------------------------------*/
 /** @brief Change or init the rectangle to this size.
  *  @param rect [in] What position and size to use.
  */
 void CswypeDialog::setRect( const Crect &rect)
 {
+    lock();
 	m_rect.setLeft( rect.left());
 	m_rect.setTop( rect.top());
+
 	int py =rect.height()*8;
 	int px =rect.width()*8;
+	if (px==0) px=25*8;
+	if (py==0) py=6*8;
 
 	if ( m_rect.width() !=rect.width() || m_rect.height() !=rect.height()
 	   || m_graphics ==NULL)
 	{
+		if ( m_graphics && m_isOwner)
+		{
+			delete m_graphics;
+			m_graphics =m_mainGraph;
+			m_isOwner =false;
+		}
 		m_rect =rect;
 		if ( m_horizontal)
 		{
@@ -114,65 +131,81 @@ void CswypeDialog::setRect( const Crect &rect)
 			py *=3;
 			py =py-(py%(itemBlocks()*8));
 		}
-	    m_graphics =std::make_shared<Cgraphics>(Csize(px, py), false);
-	    m_graphics->init();
+	    m_graphics =new Cgraphics( Csize(px, py), false);
+	    if( m_graphics != NULL)
+	    {
+		    m_graphics->init();
+		    m_isOwner =true;
+	    }
 	}
+	unlock();
 }
 
+/*----------------------------------------------------------------------------*/
 CswypeDialog::~CswypeDialog()
 {
-	clean();
-	if ( m_object)
+	CswypeDialog::clean();
+	if ( m_graphics && m_isOwner)
 	{
-		delete m_object;
-		m_object =NULL;
+		delete m_graphics;
 	}
+	m_graphics =NULL;
+	m_isOwner =false;
+	m_object = nullptr;
 }
 
+/*----------------------------------------------------------------------------*/
 void CswypeDialog::invalidate()
 {
 	resetPaintedArea();
 }
 
+/*----------------------------------------------------------------------------*/
 /** @brief Get which index it is for the object under the mouse */
 int CswypeDialog::getScrollIndex( keybutton sym)
 {
-	if ( sym<m_firstKey || sym>m_firstKey+m_nrFkeys-1)
+    int retVal = -1;
+    lock();
+	if ( sym >= m_firstKey && sym <= m_firstKey+m_nrFkeys-1)
 	{
-		return -1;
+        int key =(sym-m_firstKey);
+        int invisible =m_firstVisibleUnit;
+        int firstKey =(invisible%m_nrFkeys);
+        int offset =(key-firstKey+m_nrFkeys)%m_nrFkeys+invisible;
+        retVal = ( offset>=0 && offset<(int)rows()) ? offset:-1;
 	}
-	int key =(sym-m_firstKey);
-	int invisible =m_firstVisibleUnit;
-	int firstKey =(invisible%m_nrFkeys);
-	int offset =(key-firstKey+m_nrFkeys)%m_nrFkeys+invisible;
-	return ( offset>=0 && offset<(int)rows()) ? offset:-1;
+	unlock();
+	return retVal;
 }
 
+/*----------------------------------------------------------------------------*/
+int CswypeDialog::getScrollOffset()
+{
+    return (int)m_scrollPosition;
+}
+
+/*----------------------------------------------------------------------------*/
 /** @brief Paint a horizontal scrolling surface
  *  @param optional [in] Do or don't paint the optional fields
  */
 void CswypeDialog::onPaintSurfaceHorizontal( bool optional)
 {
-	static int count =5;
+	lock();
+    calculateSurfacePosition();
+    bool stop = false;
 
-	for (int mx=0; mx<200; mx++) // Remove endless loop.
+	for (int mx=0; mx<200 && !stop; mx++) // Remove endless loop.
 	{
 		// Check what to paint.
 		switch ( visiblePainted())
 		{
 		case PAINT_LEFT:
-			if (paintSurfaceLeft() ==false)
-			{
-				return;
-			}
+			paintSurfaceLeft();
 			m_repaint =true;
 			break;
 
 		case PAINT_RIGHT:
-			if ( paintSurfaceRight() ==false)
-			{
-				return;
-			}
+			paintSurfaceRight();
 			m_repaint =true;
 			break;
 
@@ -187,43 +220,52 @@ void CswypeDialog::onPaintSurfaceHorizontal( bool optional)
 			break;
 
 		case PAINT_TOP_OPTIONAL:
-			if ( !optional) return;
-			if ( --count>0) return;
-			paintSurfaceTop();
-			count =5;
-			return;
+			if (optional)
+			{
+				paintSurfaceTop();
+			}
+			stop = true;
+			break;
 
 		case PAINT_BOTTOM_OPTIONAL:
-			if ( !optional) return;
-			if ( --count>0) return;
-			paintSurfaceBottom();
-			count =5;
-			return;
+			if (optional)
+			{
+				paintSurfaceBottom();
+			}
+			stop = true;
+			break;
 
 		case PAINT_LEFT_OPTIONAL:
-			if ( !optional) return;
-			if ( --count>0) return;
-			paintSurfaceLeft();
-			count =5;
-			return;
+			if (optional)
+			{
+				paintSurfaceLeft();
+			}
+			stop = true;
+			break;
 
 		case PAINT_RIGHT_OPTIONAL:
-			if ( !optional) return;
-			if ( --count>0) return;
-			count =5;
-			paintSurfaceRight();
+			if (optional)
+			{
+				paintSurfaceRight();
+			}
+			break;
 
 		case PAINT_READY:
-			return;
+			stop = true;
+			break;
+
 		default:
 			break;
 		}
 	}
+	unlock();
 }
 
+/*----------------------------------------------------------------------------*/
 /** @brief Calculate the square of a single rectangle in our swipe dialog */
 void CswypeDialog::calculateItemRect()
 {
+    lock();
 	if ( m_horizontal)
 	{
 		m_itemRect =Crect( 0,0, m_itemBlocks, m_rect.height());
@@ -232,51 +274,68 @@ void CswypeDialog::calculateItemRect()
 	{
 		m_itemRect =Crect( 0,0, m_rect.width(), m_itemBlocks);
 	}
+	unlock();
 }
 
+/*----------------------------------------------------------------------------*/
 /// @brief The surface area should be painted, else not done!
 Epainted CswypeDialog::visiblePainted()
 {
-	if (m_firstVisibleUnit >m_lastUnitPainted || m_lastVisibleUnit <m_firstUnitPainted)
-	{
-		m_firstUnitPainted =m_firstVisibleUnit;
-		m_lastUnitPainted =m_firstVisibleUnit;
-		m_visibleBuffers =0;
-	}
 	if ( m_firstVisibleUnit <m_firstUnitPainted)
 	{
+	    m_lowPrioCount = 1000;
 		return m_horizontal ? PAINT_LEFT:PAINT_TOP;
 	}
 	if ( m_lastUnitPainted <m_lastVisibleUnit)
 	{
+	    m_lowPrioCount = 1000;
 		return m_horizontal ? PAINT_RIGHT:PAINT_BOTTOM;
 	}
-	if ( m_firstUnitPainted >m_firstOptionalUnit && m_visibleBuffers<m_validBuffers)
+	if (--m_lowPrioCount<0)
 	{
-		return m_horizontal ? PAINT_LEFT_OPTIONAL:PAINT_TOP_OPTIONAL;
-	}
-	if ( m_lastUnitPainted <m_lastOptionalUnit && m_visibleBuffers<m_validBuffers)
-	{
-		return m_horizontal ? PAINT_RIGHT_OPTIONAL:PAINT_BOTTOM_OPTIONAL;
+	    m_lowPrioCount = 1000;
+        int optionsPaintedFirst = m_firstUnitPainted - m_firstOptionalUnit;
+        int optionsPaintedLast = (m_lastOptionalUnit - m_lastUnitPainted) -
+                        (m_lastVisibleUnit - m_firstVisibleUnit);
+
+        if (optionsPaintedFirst < optionsPaintedLast)
+        {
+            // First has prio.
+            if ( m_firstUnitPainted > m_firstOptionalUnit)
+            {
+                return m_horizontal ? PAINT_LEFT_OPTIONAL:PAINT_TOP_OPTIONAL;
+            }
+        }
+        if ( m_lastUnitPainted < m_lastOptionalUnit)
+        {
+            return m_horizontal ? PAINT_RIGHT_OPTIONAL:PAINT_BOTTOM_OPTIONAL;
+        }
+        if ( m_firstUnitPainted > m_firstOptionalUnit)
+        {
+            return m_horizontal ? PAINT_LEFT_OPTIONAL:PAINT_TOP_OPTIONAL;
+        }
+        m_spares.clear();
 	}
 	return PAINT_READY;
 }
 
+/*----------------------------------------------------------------------------*/
 /** @brief Paint a vertical scrolling surface
  *  @param optional [in] Do or don't paint the optional fields
  */
 void CswypeDialog::onPaintSurfaceVertical( bool optional)
 {
-	static int count =5;
 	calculateSurfacePosition();
 
-	for (int mx=0; mx<2000; mx++) // Remove endless loop.
+	// Check if we should reset the view?
+	if ( m_firstUnitPainted>=0 && (m_firstUnitPainted>m_lastVisibleUnit || m_lastUnitPainted<m_firstVisibleUnit))
 	{
-		// Check if we can paint?
-		if ( m_firstUnitPainted>0 && (m_firstUnitPainted>m_lastVisibleUnit || m_lastUnitPainted<m_firstVisibleUnit))
-		{
-			resetPaintedArea();
-		}
+		resetPaintedArea();
+	}
+
+	// Paint up to 200 things.
+	for (int mx=0; mx<200; mx++) // Remove endless loop.
+	{
 		// Check what to paint.
 		switch ( visiblePainted())
 		{
@@ -292,16 +351,12 @@ void CswypeDialog::onPaintSurfaceVertical( bool optional)
 
 		case PAINT_TOP_OPTIONAL:
 			if ( !optional) return;
-			if ( --count>0) return;
-			count=10;
 			paintSurfaceTop();
 			m_repaint =true;
 			return;
 
 		case PAINT_BOTTOM_OPTIONAL:
 			if ( !optional) return;
-			if ( --count>0) return;
-			count=10;
 			paintSurfaceBottom();
 			m_repaint =true;
 			return;
@@ -314,174 +369,120 @@ void CswypeDialog::onPaintSurfaceVertical( bool optional)
 	}
 }
 
+/*----------------------------------------------------------------------------*/
 /** @brief Insert a texture at the begin of the list
  *  @return Pointer to (new) object
  */
-CswypeObject *CswypeDialog::insertAtBegin()
+std::shared_ptr<CswypeObject> CswypeDialog::insertAtBegin(const Crect &rect)
 {
-	sdlTexture *texture;
-	CswypeObject *obj;
-	// Erase first item?
-	m_visibleSize =m_lastVisibleUnit-m_firstVisibleUnit+1;
+    std::shared_ptr<CswypeObject> obj;
 
-	if ( m_visibleBuffers<m_validBuffers)
+    lock();
+	try
 	{
-		// Re-use last image in list if too many
-		obj =m_swypeObjects[ m_validBuffers-1];
-		texture =obj->texture;
-		m_swypeObjects.erase( m_swypeObjects.begin()+m_validBuffers-1);
-		m_swypeObjects.insert( m_swypeObjects.begin(), obj);
-		m_visibleBuffers++;
+        int rows = (int)m_swypeObjects.size();
+        // Erase first item?
+        m_visibleSize =m_lastVisibleUnit-m_firstVisibleUnit+1;
+
+        if ( !m_spares.empty())
+        {
+            // Re-use one of the spares
+            obj =m_spares[0];
+            m_spares.erase( m_spares.begin());
+        }
+        else if (m_lastUnitPainted > m_lastOptionalUnit && rows)
+        {
+            obj =m_swypeObjects.at(rows - 1);
+            m_swypeObjects.erase( m_swypeObjects.begin() + rows - 1);
+            m_lastUnitPainted--;
+        }
+        Csize size = rect.size();
+        if ( !obj.get() || !obj->compareSize(size))
+        {
+            // Create new one.
+            obj =std::make_shared<CswypeObject>( size, 0, rect);
+        }
+        m_swypeObjects.insert( m_swypeObjects.begin(), obj);
+        obj->index =--m_firstUnitPainted;
 	}
-	else if ( m_visibleBuffers>=m_visibleSize*3)
-	{
-		// Re-use last valid image in list
-		obj =m_swypeObjects[ m_validBuffers-1];
-		texture =obj->texture;
-		m_swypeObjects.erase( m_swypeObjects.begin()+m_validBuffers-1);
-		m_swypeObjects.insert( m_swypeObjects.begin(), obj);
-		// Need to correct last unit painted.
-		int last =m_swypeObjects[m_validBuffers-1]->index;
-		if ( last<m_lastUnitPainted)
-		{
-			m_lastUnitPainted =last+1;
-		}
-	}
-	else
-	{
-		// Create new one.
-		texture =createSurface();
-		obj =new CswypeObject( texture, 0, m_itemRect);
-		if ( !texture || !obj)
-		{
-			return NULL;
-		}
-		m_validBuffers++;
-		m_visibleBuffers++;
-		m_swypeObjects.insert( m_swypeObjects.begin(), obj);
-	}
-	obj->index =--m_firstUnitPainted;
+    catch (...)
+    {
+        Cgraphics::m_defaults.log("ERROR CswypeDialog::insertAtBegin");
+    }
+
+	unlock();
 	return obj;
 }
 
-/** @brief Create a surface for a part of the swipe to use
- *  @return Surface pointer
- */
-sdlTexture *CswypeDialog::createSurface()
-{
-#ifdef USE_SDL2
-	SDL_Texture *texture =SDL_CreateTexture( graphics()->getRenderer(),
-			SDL_PIXELFORMAT_ARGB8888,
-			SDL_TEXTUREACCESS_TARGET, m_itemRect.width()*8, m_itemRect.height()*8); //, itemBlocks()*8, m_rect.height()*8);
-	return texture;
-#else
-	int options =SDL_SWSURFACE; //|SDL_NOFRAME;
-    Uint32 rmask, gmask, bmask, amask;
-
-    /* SDL interprets each pixel as a 32-bit number, so our masks must depend
-       on the endianness (byte order) of the machine */
-	#if 0 //SDL_BYTEORDER ==SDL_BIG_ENDIAN
-		rmask = 0xff000000;
-		gmask = 0x00ff0000;
-		bmask = 0x0000ff00;
-		amask = 0x000000ff;
-	#else
-		bmask = 0x000000ff;
-		gmask = 0x0000ff00;
-		rmask = 0x00ff0000;
-		amask = 0; //0xff000000;
-	#endif
-
-    SDL_Surface *surface =SDL_CreateRGBSurface( options, m_itemRect.width()*8, m_itemRect.height()*8,
-    		                         32, //::m_mainGraph->m_renderSurface->format->BitsPerPixel,
-                                     rmask, gmask, bmask, amask);
-	return surface;
-#endif
-}
-
-/** @brief Create a surface for a part of the swipe to use
- *  @return Surface pointer
- */
-sdlTexture *CswypeDialog::createSurface( int w, int h)
-{
-#ifdef USE_SDL2
-	(void)w;
-	(void)h;
-	SDL_Texture *texture =SDL_CreateTexture( graphics()->getRenderer(),
-			SDL_PIXELFORMAT_ARGB8888,
-			SDL_TEXTUREACCESS_TARGET, m_itemRect.width()*8, m_itemRect.height()*8); //, itemBlocks()*8, m_rect.height()*8);
-	return texture;
-#else
-	int options =SDL_SWSURFACE; //|SDL_NOFRAME;
-    Uint32 rmask, gmask, bmask, amask;
-
-    /* SDL interprets each pixel as a 32-bit number, so our masks must depend
-       on the endianness (byte order) of the machine */
-	#if 0 //SDL_BYTEORDER ==SDL_BIG_ENDIAN
-		rmask = 0xff000000;
-		gmask = 0x00ff0000;
-		bmask = 0x0000ff00;
-		amask = 0x000000ff;
-	#else
-		bmask = 0x000000ff;
-		gmask = 0x0000ff00;
-		rmask = 0x00ff0000;
-		amask = 0; //0xff000000;
-	#endif
-
-    SDL_Surface *surface =SDL_CreateRGBSurface( options, w*8, h*8,
-    		                         32, //::m_mainGraph->m_renderSurface->format->BitsPerPixel,
-                                     rmask, gmask, bmask, amask);
-	return surface;
-#endif
-}
-
+/*----------------------------------------------------------------------------*/
 /** @brief Insert a texture at the end of the list
  *  @return Pointer to (new) object
  */
-CswypeObject *CswypeDialog::insertAtEnd()
+CswypeObjectPtr CswypeDialog::insertAtEnd(const Crect &rect)
 {
-	sdlTexture *texture;
-	CswypeObject *obj;
-	// Erase first item?
-	m_visibleSize =m_lastVisibleUnit-m_firstVisibleUnit+1;
-	if ( m_visibleBuffers< m_validBuffers)
+    CswypeObjectPtr obj = nullptr;
+
+    lock();
+	try
 	{
-		int sz=(int)m_swypeObjects.size();
-		if ( sz!=m_validBuffers)
-		{
-			return NULL;
-		}
-		obj =m_swypeObjects[ m_visibleBuffers++];
+	    // Erase first item?
+	    m_visibleSize =m_lastVisibleUnit-m_firstVisibleUnit+1;
+
+	    if (!m_spares.empty())
+        {
+	        // Re-use one of the spares
+            obj = m_spares[0];
+            m_spares.erase( m_spares.begin() );
+        }
+	    else if (m_firstUnitPainted < m_firstOptionalUnit && !m_swypeObjects.empty())
+	    {
+            obj =m_swypeObjects[0];
+            m_swypeObjects.erase(m_swypeObjects.begin());
+            m_firstUnitPainted++;
+	    }
+        Csize size = rect.size();
+        if ( !obj.get() || !obj->compareSize(size))
+	    {
+	        // Create new one.
+	        obj =std::make_shared<CswypeObject>( size, 0, rect);
+	    }
+        m_swypeObjects.push_back( obj);
+        obj->index =m_lastUnitPainted++;
 	}
-	else if ( m_visibleBuffers>=m_visibleSize*3)
+	catch (...)
+    {
+        Cgraphics::m_defaults.log("ERROR CswypeDialog::insertAtEnd");
+    }
+	unlock();
+	return obj;
+}
+
+/*----------------------------------------------------------------------------*/
+/** @brief Insert a texture at the end of the list
+ *  @return Pointer to (new) object
+ */
+void CswypeDialog::popFirst()
+{
+	lock();
+    try
+    {
+	m_visibleSize =m_lastVisibleUnit-m_firstVisibleUnit+1;
+	// Erase first item?
+	if (m_visibleSize >0)
 	{
-		// Re-use first image in list if too many
-		obj =m_swypeObjects[ 0];
 		m_swypeObjects.erase( m_swypeObjects.begin());
-		m_swypeObjects.push_back( obj);
-		int first =m_swypeObjects[0]->index;
+		int first =m_swypeObjects.at(0)->index;
 		if ( first>m_firstUnitPainted)
 		{
 			m_firstUnitPainted =first;
 		}
 	}
-	else
-	{
-		// Create new one.
-		texture =createSurface();
-		obj =new CswypeObject( texture, 0, m_itemRect);
-		if ( !texture || !obj)
-		{
-			// ("CswypeDialog::insertAtEnd  Cannot create texture+object");
-			return NULL;
-		}
-		m_swypeObjects.push_back( obj);
-		m_validBuffers++;
-		m_visibleBuffers++;
-	}
-	obj->index =m_lastUnitPainted++;
-	return obj;
+    }
+    catch (...)
+    {
+        Cgraphics::m_defaults.log("ERROR CswypeDialog::popFirst");
+    }
+	unlock();
 }
 
 /** @brief Paint a row on top of a scrolling dialog.
@@ -490,187 +491,207 @@ CswypeObject *CswypeDialog::insertAtEnd()
  */
 void CswypeDialog::paintSurfaceTop()
 {
-	CswypeObject *obj =insertAtBegin();
-	// Actual painting
-	m_graphics->setRenderArea( obj->texture);
-	onPaintUnit( obj->index, m_itemRect);
-	m_graphics->setRenderArea( NULL);
+	paintSurfaceLeft();
 }
 
+/*----------------------------------------------------------------------------*/
 /** @brief Paint a column on the left of a scrolling dialog.
  *  @param row [in] Which row or element.
  *  @param location [in] Location in a temporary surface.
  */
-bool CswypeDialog::paintSurfaceLeft()
+void CswypeDialog::paintSurfaceLeft()
 {
-	CswypeObject *obj =insertAtBegin();
+	CswypeObjectPtr obj =insertAtBegin(m_itemRect);
 	// Actual painting
-	graphics()->setRenderArea( obj->texture);
+	m_graphics->setRenderArea( obj->getTexture());
 	onPaintUnit( obj->index, m_itemRect);
-	graphics()->setRenderArea( NULL);
-	return true;
+	m_graphics->setRenderArea( NULL);
+
+	//Cgraphics::m_defaults.log("CswypeDialog::paintSurfaceLeft %d", obj->index);
 }
 
+/*----------------------------------------------------------------------------*/
 /** @brief Paint a row on the bottom of a scrolling dialog.
  *  @param row [in] Which row or element.
  *  @param location [in] Location in a temporary surface.
  */
 void CswypeDialog::paintSurfaceBottom()
 {
-	CswypeObject *obj =insertAtEnd();
-	if (obj)
-	{
-		// Actual painting
-		m_graphics->setRenderArea( obj->texture);
-		onPaintUnit( obj->index, m_itemRect);
-		m_graphics->setRenderArea( NULL);
-	}
+	paintSurfaceRight();
 }
 
+/*----------------------------------------------------------------------------*/
 /** @brief Paint a column on the right of a scrolling dialog.
  *  @param row [in] Which row or element.
  *  @param location [in] Location in a temporary surface.
  */
-bool CswypeDialog::paintSurfaceRight()
+void CswypeDialog::paintSurfaceRight()
 {
-	CswypeObject *obj =insertAtEnd();
-	if (obj)
+	CswypeObjectPtr obj =insertAtEnd(m_itemRect);
+
+	SDL_Surface *surface = NULL;
+	if (obj.get())
 	{
-		// Actual painting
-		graphics()->setRenderArea( obj->texture);
-		onPaintUnit( obj->index, m_itemRect);
-		graphics()->setRenderArea( NULL); // Back to main window
-		return true;
+	    surface = obj->getTexture();
 	}
-	return false;
+	if (surface)
+	{
+        // Actual painting
+        m_graphics->setRenderArea( obj->getTexture());
+        onPaintUnit( obj->index, m_itemRect);
+        m_graphics->setRenderArea( NULL); // Back to main window
+	}
 }
 
+/*----------------------------------------------------------------------------*/
 /// @brief Paint all things.
 void CswypeDialog::onPaint()
 {
 	SDL_Rect rct;
 	SDL_Rect dlg;
-	if ( !m_visible || !m_repaint)
-	{
-		return;
-	}
-	m_repaint =false;
-	graphics()->setPixelOffset(0,0);
-	if (m_horizontal)
-	{
-		onPaintSurfaceHorizontal( true);
-	}
-	else
-	{
-		onPaintSurfaceVertical( true);
-	}
-	rct.x =(Sint16)(m_rect.left()*8+m_dialogOffset.x);
-	rct.y =(Sint16)(m_rect.top()*8+m_dialogOffset.y);
-	rct.w =(Uint16)(m_rect.width()*8);
-	rct.h =(Uint16)(m_rect.height()*8);
-	dlg.x =rct.x;
-	dlg.y =rct.y;
-	dlg.w =rct.w;
-	dlg.h =rct.h;
-	m_graphics->setColour( m_backgroundColour);
-	m_graphics->setViewport( &rct);
-	m_graphics->bar( rct.x, rct.y, rct.x+rct.w, rct.y+rct.h);
-	if ( m_visibleBuffers >0)
-	{
-		if ( m_horizontal)
-		{
-			int width =itemBlocks()*8;
-			int x=rct.x+m_swypeObjects[0]->index*width-(int)m_scroll;
-			// Draw horizontal items
-			rct.w =(Uint16)(m_swypeObjects[0]->destination.width()*8);
-			rct.h =(Uint16)(m_swypeObjects[0]->destination.height()*8);
-			for ( int n=0; n<m_lastUnitPainted-m_firstUnitPainted; n++)
-			{
-				CswypeObject *obj =m_swypeObjects[n];
-				rct.x =(Sint16)x;
-				x +=width;
-				renderCopy( obj->texture, &rct);
-			}
-		}
-		else
-		{
-			int height =itemBlocks()*8;
-			int y=rct.y+m_swypeObjects[0]->index*height-(int)m_scroll;
-			// Draw horizontal items
-			rct.w =(Uint16)(m_itemRect.width()*8);
-			rct.h =(Uint16)height;
-			for ( int n=0; n<m_visibleBuffers; n++)
-			{
-				CswypeObject *obj =m_swypeObjects[n];
-				rct.y =(Sint16)y;
-				y +=height;
-				renderCopy( obj->texture, &rct);
-			}
-		}
-	}
-	// Put back old viewport
-	m_graphics->setViewport( NULL);
-	m_graphics->update(Crect(dlg.x, dlg.y, dlg.w, dlg.h));
+	lock();
+
+	if ( m_visible && m_repaint)
+    try
+    {
+        m_repaint =false;
+        m_mainGraph->setPixelOffset(0,0);
+        // Prepare to draw more buffers:
+        m_horizontal ? onPaintSurfaceHorizontal( true):onPaintSurfaceVertical( true);
+
+        rct.x =(Sint16)(m_rect.left()*8+m_dialogOffset.x);
+        rct.y =(Sint16)(m_rect.top()*8+m_dialogOffset.y);
+        rct.w =(Uint16)(m_rect.width()*8);
+        rct.h =(Uint16)(m_rect.height()*8);
+        dlg.x =rct.x;
+        dlg.y =rct.y;
+        dlg.w =rct.w;
+        dlg.h =rct.h;
+        m_mainGraph->setColour( m_backgroundColour);
+        m_mainGraph->setViewport( &rct);
+        m_mainGraph->bar( rct.x, rct.y, rct.x+rct.w, rct.y+rct.h);
+        m_horizontal ? onPaintHorizontal(rct):onPaintVertical(rct);
+        // Put back old viewport
+        m_mainGraph->setViewport( NULL);
+        m_mainGraph->update(dlg.x, dlg.y, dlg.w, dlg.h);
+    }
+    catch (const std::exception& err)
+    {
+        m_mainGraph->setViewport( NULL);
+        Cgraphics::m_defaults.log("ERROR CswypeDialog::onPaint %s", err.what());
+    }
+	unlock();
 }
 
+/*----------------------------------------------------------------------------*/
+/// @brief Paint horizontal dialog items.
+void CswypeDialog::onPaintHorizontal(SDL_Rect &rct)
+{
+    int width =itemBlocks()*8;
+    int x=rct.x+m_swypeObjects.at(0)->index*width-(int)m_scrollPosition;
+    // Draw horizontal items
+    rct.w =(Uint16)(m_swypeObjects.at(0)->destination.width()*8);
+    rct.h =(Uint16)(m_swypeObjects.at(0)->destination.height()*8);
+    for ( auto obj : m_swypeObjects)
+    {
+        rct.x =(Sint16)x;
+        x +=width;
+        renderCopy( obj->getTexture(), &rct);
+    }
+}
+
+/*----------------------------------------------------------------------------*/
+/// @brief Paint vertical dialog items.
+void CswypeDialog::onPaintVertical(SDL_Rect &rct)
+{
+    int height =itemBlocks()*8;
+    int y=rct.y+m_swypeObjects.at(0)->index*height-(int)m_scrollPosition;
+    // Draw horizontal items
+    rct.w =(Uint16)(m_itemRect.width()*8);
+    rct.h =(Uint16)height;
+    for ( auto obj : m_swypeObjects)
+    {
+        rct.y =(Sint16)y;
+        y +=height;
+        renderCopy( obj->getTexture(), &rct);
+    }
+}
+
+/*----------------------------------------------------------------------------*/
 /** @brief Render a surface
  *  @param surface [in] Swype unit to paint
  *  @param rect [in] Rectangle to use
  */
-void CswypeDialog::renderCopy( sdlTexture *surface, SDL_Rect *rect)
+void CswypeDialog::renderCopy( SDL_Surface *surface, SDL_Rect *rect)
 {
-#ifdef USE_SDL2
-	graphics()->renderTexture( surface, rect->x, rect->y, rect->w, rect->h);
-#else
-	graphics()->renderSurface( surface, rect->x, rect->y, rect->w, rect->h);
-#endif
+	m_mainGraph->surface( surface, rect->x, rect->y, rect->w, rect->h);
 }
 
+/*----------------------------------------------------------------------------*/
 /** @brief Clean dialog afterwards */
 void CswypeDialog::onCleanup()
 {
-	clean();
+	lock();
+    m_spares.clear();
+    m_swypeObjects.clear();
+
 	m_firstUnitPainted =0;
 	m_lastUnitPainted =0;
 	m_firstVisibleUnit =0;
 	m_lastVisibleUnit =0;
+    m_firstOptionalUnit =0;
+    m_lastOptionalUnit =0;
+
+    unlock();
 }
 
+/*----------------------------------------------------------------------------*/
 /// @brief  Scroll to absolute position.
 /// @param offset [in] Where to scroll to in absolute pixels
 /// @param time [in] How long it takes to go there
 /// @return True if changed value.
 bool CswypeDialog::scrollToPixel( int offset, int time)
 {
+	lock();
+	bool retVal = true;
+
 	int maxScroll =scrollMax();
 	offset =gLimit(offset, 0,maxScroll);
 	if ( time<=0)
 	{
 		m_moveTime =0;
-		return scrollRelative( (double)offset-m_scroll, false);
+		retVal = scrollRelative( (double)offset-m_scrollPosition, false);
 	}
 	else
 	{
-		m_startPosition =(int)m_scroll;
+		m_startPosition =(int)m_scrollPosition;
 		m_endPosition =offset;
 		m_timer.setTime( time, 100,3);
 		m_moveTime =time;
-		return true;
+		retVal = true;
 	}
+	unlock();
+	return retVal;
 }
 
+/*----------------------------------------------------------------------------*/
 /** @brief Calculate the maximum scroll distance.
  *  @return Number of rows in the scrolling dialog.
  */
 int CswypeDialog::scrollMax()
 {
+	lock();
+
 	m_sizes =rows();
 	int mx =m_sizes*itemBlocks()*8+m_endMargin-
 			( m_horizontal ? (m_rect.width()*8):(m_rect.height()*8) );
 	if ( mx<0) mx=0;
+
+	unlock();
 	return mx;
 }
 
+/*----------------------------------------------------------------------------*/
 /// @brief Calculate the maximum scroll distance
 /// @return Maximum scroll distance for left edge of screen rectangle
 int CswypeDialog::surfaceMax()
@@ -679,6 +700,7 @@ int CswypeDialog::surfaceMax()
 			              ( m_graphics->height()-m_rect.height()*8-m_itemBlocks*8);
 }
 
+/*----------------------------------------------------------------------------*/
 /** @brief  Scroll a certain distance.
  *  @param distance [in] Distance to move, either positive or negative
  *  @param flow [in] Do we need to flow afterwards, or stop immediately
@@ -686,69 +708,85 @@ int CswypeDialog::surfaceMax()
  */
 bool CswypeDialog::scrollRelative( double distance, bool flow)
 {
+	lock();
+
 	if ( distance >-0.1 && distance<0.1)
 	{
+	    unlock();
 		return false;
 	}
-	int db =(int)m_scroll;
-	m_scroll +=distance;
-	if ( m_scroll<0)
+	int db =(int)(m_scrollPosition+0.5);
+	m_scrollPosition +=distance;
+	if ( m_scrollPosition<0)
 	{
-		m_scroll =0;
+		m_scrollPosition =0;
 		m_speeding.clear();
 		flow =false;
 	}
 	double mx=scrollMax();
-	if ( m_scroll >mx)
+	if ( m_scrollPosition >mx)
 	{
-		m_scroll =mx;
+		m_scrollPosition =mx;
 		m_speeding.clear();
 		flow =false;
 	}
 	if ( flow)
 	{
-		m_speeding.addPosition( m_scroll);
+		m_speeding.addPosition( m_scrollPosition);
 	}
-	if ( (int)(m_scroll+0.5) ==db)
+	if ( (int)(m_scrollPosition+0.5) !=db)
 	{
-		return true;
+		m_repaint =true;
+		calculateSurfacePosition();
 	}
-	m_repaint =true;
-	calculateSurfacePosition();
+	unlock();
 	return true;
 }
 
+/*----------------------------------------------------------------------------*/
 /** Remove all buffers to see. */
 void CswypeDialog::clean()
 {
-	for ( int n=0; n<(int)m_swypeObjects.size(); n++)
-	{
-		delete m_swypeObjects[n];
-	}
-	m_swypeObjects.clear();
-	m_validBuffers =0;
-	m_visibleBuffers =0;
-	m_firstUnitPainted =0;
-	m_lastUnitPainted =0;
-	m_firstOptionalUnit =0;
-	m_lastOptionalUnit =0;
+    Cgraphics::m_defaults.log("CswypeDialog::clean  swype clear %s <<", typeid(this).name());
+    lock();
+
+    try
+    {
+        m_spares = m_swypeObjects;
+        m_swypeObjects.clear();
+        m_firstUnitPainted =0;
+        m_lastUnitPainted =0;
+        m_firstOptionalUnit =0;
+        m_lastOptionalUnit =0;
+    }
+    catch (...)
+    {
+        Cgraphics::m_defaults.log("ERROR CswypeDialog::clear %s", typeid(this).name());
+    }
+
+    unlock();
+    Cgraphics::m_defaults.log("CswypeDialog::clean  swype clear >>");
 }
 
+/*----------------------------------------------------------------------------*/
 /// @brief Calculate a new paintedArea.
 void CswypeDialog::resetPaintedArea()
 {
-	m_firstUnitPainted =0;
-	m_lastUnitPainted =0;
+	lock();
+	m_firstUnitPainted =m_firstVisibleUnit;
+	m_lastUnitPainted =m_firstVisibleUnit;
 	m_firstOptionalUnit =0;
 	m_lastOptionalUnit =0;
+    m_spares = m_swypeObjects;
+    m_swypeObjects.clear();
 
-	m_lastUnitPainted =0;
-	m_visibleBuffers =0;
 	calculateItemRect();
 	calculateSurfacePosition();
 	m_repaint =true;
+	unlock();
 }
 
+/*----------------------------------------------------------------------------*/
 /** @brief Make sure the item is visible.
  *  @param row [in] For horizontal it is the column, for vertical scrolling it is a row.
  */
@@ -756,16 +794,22 @@ void CswypeDialog::makeSureRowVisible( int row, int time)
 {
 	// Check if item y is on screen.
 	int pixels =itemBlocks()*8;
+	if ( pixels == 0)
+	{
+		return;
+	}
+	lock();
+
     row =row*pixels;
 	if ( m_horizontal)
 	{
 		int width =(m_rect.width()*8)/pixels; // Number of items horizontal
 		int margin =(width*2)/3;
-		if ( row<(int)m_scroll)
+		if ( row<(int)m_scrollPosition)
 		{
 			scrollToPixel( row-pixels*(width/3), time);
 		}
-		if ( row>(int)m_scroll+m_rect.width()*8-pixels)
+		if ( row>(int)m_scrollPosition+m_rect.width()*8-pixels)
 		{
 			scrollToPixel( row-pixels*margin, time);
 		}
@@ -775,61 +819,70 @@ void CswypeDialog::makeSureRowVisible( int row, int time)
 		int height =(m_rect.height()*8)/pixels;	// Number of items vertical
 		int margin =(height*2)/3;
 
-		if ( row<(int)(m_scroll+0.5))
+		if ( row<(int)(m_scrollPosition+0.5))
 		{
 			scrollToPixel( row-pixels*(height/3), time);
-			return;
 		}
-		if ( row>(int)(m_scroll+0.5)+m_rect.height()*8-pixels)
+		else if ( row>(int)(m_scrollPosition+0.5)+m_rect.height()*8-pixels)
 		{
 			scrollToPixel( row-pixels*margin, time);
 		}
 	}
+	unlock();
 }
 
+/*----------------------------------------------------------------------------*/
 /** @brief Stop the swyping and set to top */
 void CswypeDialog::topStop()
 {
+    lock();
 	scrollIndex(0,0);
 	m_speeding.clear();
+	unlock();
 }
 
+/*----------------------------------------------------------------------------*/
 /** @brief Is the row visible?
  *  @param row [in] For horizontal it is the column, for vertical scrolling it is a row.
  *  @return TRUE on visible.
  */
 bool CswypeDialog::isRowVisible( int row)
 {
+	lock();
+
+	bool retVal = true;
 	// Check if item y is on screen.
 	int pixels =itemBlocks()*8;
 
 	if ( m_horizontal)
 	{
 		row=row*pixels;
-		if ( row<(int)(m_scroll+0.5))
+		if ( row<(int)(m_scrollPosition+0.5))
 		{
-			return false;
+			retVal = false;
 		}
-		if ( row>(int)(m_scroll+0.5)+m_rect.width()*8-pixels)
+		else if ( row>(int)(m_scrollPosition+0.5)+m_rect.width()*8-pixels)
 		{
-			return false;
+			retVal = false;
 		}
 	}
 	else
 	{
 		row=row*pixels;
-		if ( row<(int)(m_scroll+0.5))
+		if ( row<(int)(m_scrollPosition+0.5))
 		{
-			return false;
+			retVal = false;
 		}
-		if ( row>(int)(m_scroll+0.5)+m_rect.height()*8-pixels)
+		else if ( row>(int)(m_scrollPosition+0.5)+m_rect.height()*8-pixels)
 		{
-			return false;
+			retVal = false;
 		}
 	}
-	return true;
+	unlock();
+	return retVal;
 }
 
+/*----------------------------------------------------------------------------*/
 /// @brief  Depending on the scroll offset and painted area, we calculate the drawing area.
 void CswypeDialog::calculateSurfacePosition()
 {
@@ -838,14 +891,14 @@ void CswypeDialog::calculateSurfacePosition()
 	if ( m_horizontal)
 	{
 		siz =m_itemRect.width()*8;
-		m_firstVisibleUnit =(int)(m_scroll/siz);
-		m_lastVisibleUnit =(int)((m_scroll+m_rect.width()*8+siz-1)/siz);
+		m_firstVisibleUnit =(int)(m_scrollPosition/siz);
+		m_lastVisibleUnit =(int)((m_scrollPosition+m_rect.width()*8+siz-1)/siz);
 	}
 	else
 	{
 		siz =m_itemRect.height()*8;
-		m_firstVisibleUnit =(int)(m_scroll/siz);
-		m_lastVisibleUnit =(int)((m_scroll+m_rect.height()*8+siz-1)/siz);
+		m_firstVisibleUnit =(int)(m_scrollPosition/siz);
+		m_lastVisibleUnit =(int)((m_scrollPosition+m_rect.height()*8+siz-1)/siz);
 	}
 	m_firstOptionalUnit =m_firstVisibleUnit-m_listSize/4;
 	m_lastOptionalUnit =m_lastVisibleUnit+m_listSize/4;
@@ -857,9 +910,9 @@ void CswypeDialog::calculateSurfacePosition()
 	{
 		m_lastOptionalUnit=nrRows-m_endMargin;
 	}
-	//printf("First=%d, Last=%d,  Optional=%d-%d\n", m_firstVisibleUnit, m_lastVisibleUnit, m_firstOptionalUnit, m_lastOptionalUnit);
 }
 
+/*----------------------------------------------------------------------------*/
 /// @brief Set index to a certain item in the list.
 /// @return True if changed.
 bool CswypeDialog::scrollIndex( double row, int time)
@@ -868,16 +921,16 @@ bool CswypeDialog::scrollIndex( double row, int time)
 	return retVal;
 }
 
-
+/*----------------------------------------------------------------------------*/
 /** @brief Calculate number of rows we have.
  *  @return Number of rows.
  */
 size_t CswypeDialog::rows()
 {
-    return 10;
+    return 0;
 }
 
-
+/*----------------------------------------------------------------------------*/
 /** @brief Calculate height of a single row/item.
  *  @return Height of a single item/row.
  */
@@ -899,6 +952,8 @@ bool CswypeDialog::onLoop()
 	{
 		return m_alive;
 	}
+	lock();
+
 	//double speed;
 	switch ( CdialogEvent::Instance()->getStatus())
 	{
@@ -909,8 +964,6 @@ bool CswypeDialog::onLoop()
 		break;
 
 	case MOUSE_RELEASED:
-		//speed =m_speeding.getRelative();
-		//Log.write( "Scroll speed =%f", speed);
 		if ( m_moveTime !=0)
 		{
 			m_speeding.clear();
@@ -941,7 +994,7 @@ bool CswypeDialog::onLoop()
 			double offset =((m_endPosition-m_startPosition)*timer/m_moveTime)+m_startPosition;
 			int maxY =scrollMax();
 			offset =gLimit(offset, 0,maxY);
-			double relative =offset-m_scroll;
+			double relative =offset-m_scrollPosition;
 			if ( m_endPosition+relative >-10.0 && m_endPosition+relative<10.0)
 			{
 				// ( "Reach end!");
@@ -958,9 +1011,23 @@ bool CswypeDialog::onLoop()
 		}
 	}
 	onPaint();
+	unlock();
 	return m_alive;
 }
 
+/*----------------------------------------------------------------------------*/
+bool CswypeDialog::hasReachedEndPosition()
+{
+	return m_endPosition == m_startPosition;
+}
+
+/*----------------------------------------------------------------------------*/
+void CswypeDialog::setDirection(bool horizontal)
+{
+	m_horizontal = horizontal;
+}
+
+/*----------------------------------------------------------------------------*/
 /** @brief Stop auto scroll of the swipe dialog */
 void CswypeDialog::clearSpeed()
 {
@@ -975,7 +1042,7 @@ void CswypeDialog::clearSpeed()
 /// @post       Mouse event handled.
 ///
 /*============================================================================*/
-Estatus CswypeDialog::onButton( keymode mod, keybutton sym)
+Estatus CswypeDialog::onButton( SDLMod mod, keybutton sym)
 {
 	(void)mod;
 	(void)sym;
@@ -983,40 +1050,65 @@ Estatus CswypeDialog::onButton( keymode mod, keybutton sym)
 	return stat;
 }
 
+/*----------------------------------------------------------------------------*/
 /** @brief Set the height of a single item
  *  @param rowHeight [in] Set item blocks
  */
 void CswypeDialog::setItemBlocks( int rowHeight)
 {
+	lock();
+
 	if (m_itemBlocks==0 || m_itemBlocks>400)
 	{
 		m_itemBlocks=5;
 	}
 	m_itemBlocks =rowHeight;
 	calculateItemRect();
+
+	unlock();
 }
 
+/*----------------------------------------------------------------------------*/
+void CswypeDialog::setFirstKey( keybutton key)
+{
+    m_firstKey = key;
+}
+
+/*----------------------------------------------------------------------------*/
 /** Decide which key in a scroll dialog.
  *  @param p [in] Position of button
  */
 keybutton CswypeDialog::findButton( const Cpoint &p)
 {
-	if ( m_visible ==false)
+    lock();
+	keybutton retVal = KEY_NONE;
+
+	if ( m_visible)
 	{
-		return KEY_NONE;
+		m_dialogSpeed =0;
+		Cpoint q=p/8;
+		if ( m_rect.inside( q)==true && m_visible ==true)
+		{
+			int item;
+			if (m_horizontal)
+			{
+				item = (int)((p.x-m_rect.left()*8+m_scrollPosition)/(8*itemBlocks()));
+			}
+			else
+			{
+				item = (int)((p.y-m_rect.top()*8+m_scrollPosition)/(8*itemBlocks()));
+			}
+
+			retVal = (keybutton)(m_firstKey+(item%m_nrFkeys));
+			CLICK_SOUND();
+		}
 	}
-	m_dialogSpeed =0;
-	Cpoint q=p/8;
-	if ( m_rect.inside( q)==true && m_visible ==true)
-	{
-		int item =(int)((p.y-m_rect.top()*8+m_scroll)/(8*itemBlocks()));
-		keybutton key =(keybutton)(m_firstKey+(item%m_nrFkeys));
-		Caudio::Instance()->click();
-		return key;
-	}
-	return KEY_NONE;
+	unlock();
+
+	return retVal;
 }
 
+/*----------------------------------------------------------------------------*/
 /// @brief Roll the wheel in the middle.
 void CswypeDialog::wheelUp( int mx, int my)
 {
@@ -1025,6 +1117,17 @@ void CswypeDialog::wheelUp( int mx, int my)
 	scrollRelative(-2, false);
 }
 
+/*----------------------------------------------------------------------------*/
+double CswypeDialog::getScrollIndex()
+{
+    lock();
+    int blocks = itemBlocks();
+    int retVal = blocks ? m_scrollPosition/(double)(itemBlocks()*8):0;
+    unlock();
+    return retVal;
+}
+
+/*----------------------------------------------------------------------------*/
 /// @brief Roll the wheel in the middle.
 void CswypeDialog::wheelDown( int mx, int my)
 {
@@ -1033,6 +1136,7 @@ void CswypeDialog::wheelDown( int mx, int my)
 	scrollRelative(+2, false);
 }
 
+/*----------------------------------------------------------------------------*/
 /// @brief constructor.
 Cspeeding::Cspeeding()
 : m_measurements(0)
@@ -1041,6 +1145,7 @@ Cspeeding::Cspeeding()
 	m_friction =Cgraphics::m_defaults.swype_friction;
 }
 
+/*----------------------------------------------------------------------------*/
 /** @brief Add a new position to the speeding
  *  @param position [in] Relative position to add to the speed
  */
@@ -1063,19 +1168,22 @@ void Cspeeding::addPosition( double position)
 	{
 		// Same time, no use to record timestamps.
 		m_position[0]=position;
-		return;
 	}
-	int n=( m_measurements>=MEASUREMENTS) ? MEASUREMENTS-1:m_measurements;
-	for ( int x=n-1; x>=0; x--)
+	else
 	{
-		m_position[x+1] =m_position[x];
-		m_time[x+1] =m_time[x];
+		int n=( m_measurements>=MEASUREMENTS) ? MEASUREMENTS-1:m_measurements;
+		for ( int x=n-1; x>=0; x--)
+		{
+			m_position[x+1] =m_position[x];
+			m_time[x+1] =m_time[x];
+		}
+		m_position[0] =position;
+		m_time[0] =(double)delta_t;
+		if ( m_measurements<MEASUREMENTS) m_measurements++;
 	}
-	m_position[0] =position;
-    m_time[0] =(double)delta_t;
-    if ( m_measurements<MEASUREMENTS) m_measurements++;
 }
 
+/*----------------------------------------------------------------------------*/
 /** @brief Get speed to run now
  *  @return speed in pixels
  */
@@ -1099,36 +1207,45 @@ double Cspeeding::getSpeed()
 	{
 		return 0;
 	}
+	double speed = totalSpeed*1000.0f/(1000.0f+(delta_t*m_friction)/10.0f);
 	//totalSpeed/=(1+m_friction*y);
-	return totalSpeed*1000.0f/(1000.0f+(delta_t*m_friction)/10.0f);
+	return speed;
 }
 
+/*----------------------------------------------------------------------------*/
 /** @brief Paint one item in the list again
  *  @param row [in] What item to paint
  */
 void CswypeDialog::invalidate( int row)
 {
-	if ( row<0 || m_visibleBuffers<=0)
+	lock();
+	try
+	{
+	if ( row<0)
 	{
 		m_repaint =true;
-		return;
 	}
-	int idx;
-	CswypeObject *obj;
-	int sz=(int)m_swypeObjects.size();
-	for ( idx=0; idx<sz; idx++)
+	else
 	{
-		obj =m_swypeObjects[ idx];
-		if ( obj && obj->index ==row)
+		for ( auto obj : m_swypeObjects)
 		{
-			graphics()->setRenderArea( obj->texture);
-			Crect rect( 0, 0, obj->destination.width(), obj->destination.height());
-			onPaintUnit( row, rect);
-			graphics()->setRenderArea( NULL);
-			m_repaint =true;
-			break;
+			if (obj->index ==row)
+			{
+				m_mainGraph->setRenderArea( obj->getTexture());
+				Crect rect( 0, 0, obj->destination.width(), obj->destination.height());
+				onPaintUnit( row, rect);
+				m_mainGraph->setRenderArea( NULL);
+				m_repaint =true;
+				break;
+			}
 		}
 	}
+	}
+	catch (...)
+	{
+	    Cgraphics::m_defaults.log("ERROR CswypeDialog::invalidate");
+	}
+	unlock();
 }
 
 /** @brief Change cursor to other position
@@ -1136,68 +1253,122 @@ void CswypeDialog::invalidate( int row)
  */
 void CswypeDialog::setCursor( int unit)
 {
+	lock();
+
     m_speeding.clear();
 	if ( unit ==m_cursor)
 	{
 		invalidate( m_cursor);
 		makeSureRowVisible( unit, 1000);
-		return;
 	}
-	int prev =m_cursor;
-	m_cursor =unit;
-
-	invalidate( prev);
-	invalidate( unit);
-	if ( unit>=0)
+	else
 	{
-		makeSureRowVisible( unit, 1000);
+		int prev =m_cursor;
+		m_cursor =unit;
+
+		invalidate( prev);
+		invalidate( unit);
+		if ( unit>=0)
+		{
+			makeSureRowVisible( unit, 1000);
+		}
 	}
+	unlock();
 }
 
+/*----------------------------------------------------------------------------*/
+void CswypeDialog::enableDrag( bool drag)
+{
+	m_dragEnable=drag;
+}
+
+/*----------------------------------------------------------------------------*/
+bool CswypeDialog::isScrollDragDialog( const Cpoint &p)
+{
+	(void)p;
+	return m_dragEnable;
+}
+
+/*----------------------------------------------------------------------------*/
+bool CswypeDialog::isHorizontalScrollDialog( const Cpoint &p)
+{
+	(void)p;
+	return m_horizontal;
+}
+
+/*----------------------------------------------------------------------------*/
+int CswypeDialog::getDragIndex()
+{
+	return m_dragIndex;
+}
+
+/*----------------------------------------------------------------------------*/
+void CswypeDialog::repaint()
+{
+	m_repaint=true; CswypeDialog::onPaint();
+}
+
+/*----------------------------------------------------------------------------*/
+void CswypeDialog::setMargin( double margin)
+{
+	m_endMargin =(int)( margin*8.0f*itemBlocks());
+}
+
+/*----------------------------------------------------------------------------*/
 /** @brief Find object for a certain point. Not in sub-dialogs!
  *  @return Object found at certain location
  */
-CdialogObject * CswypeDialog::findObject( const Cpoint &p)
+CdialogObjectPtr CswypeDialog::findObject( const Cpoint &p)
 {
-	Cpoint q=p/8;
-	if ( m_rect.inside( q)==false || m_visible ==false)
+    lock();
+	CdialogObjectPtr retVal;
+
+	try
 	{
-		return NULL;
+	    Cpoint q=p/8;
+        if ( m_rect.inside( q) && m_visible)
+        {
+            int itemPixelHeight =8*itemBlocks();
+            int row =(int)((p.y-m_rect.top()*8+m_scrollPosition)/itemPixelHeight);
+            if ( row >=0 && row<(int)rows())
+            {
+                retVal = m_swypeObjects.at(row)->getDialogObject();
+            }
+            m_dragIndex =row;
+            m_object->m_rect.setTop( (int)(m_rect.top()+(m_dragIndex*itemPixelHeight-m_scrollPosition)/8) );
+            retVal = m_object;
+        }
 	}
-	int itemPixelHeight =8*itemBlocks();
-	int row =(int)((p.y-m_rect.top()*8+m_scroll)/itemPixelHeight);
-	if ( row<0 || row>=(int)rows())
-	{
-		return NULL;
-	}
-	m_dragIndex =row;
-	m_object->m_rect.setTop( (int)(m_rect.top()+(m_dragIndex*itemPixelHeight-m_scroll)/8) );
-	return m_object;
+    catch (...)
+    {
+        Cgraphics::m_defaults.log("ERROR CswypeDialog::findObject");
+    }
+	unlock();
+	return retVal;
 }
 
+/*----------------------------------------------------------------------------*/
 /** Paint on normal background
  *  @param row [in] What to paint
  *  @param location [in] Where to paint it
  */
 void CswypeDialog::onPaintBackground( int row, const Crect &location)
 {
-#ifdef USE_SDL2
-	(void)row;
-	onPaintUnit( m_dragIndex, location);
-#else
+    lock();
 	(void)row;
 	Cgraphics *previous =m_graphics;
 	Cdialog *parent =m_parent;
 	m_graphics =m_mainGraph;
 	m_parent =NULL;
-	m_object->m_graphics =m_mainGraph;
+	m_object->setGraphics(m_mainGraph);
 	m_graphics =m_mainGraph;
 	onPaintUnit( m_dragIndex, location);
 	m_graphics =previous;
 	m_parent =parent;
-#endif
+    unlock();
 }
 
+/*----------------------------------------------------------------------------*/
 /** @brief Scroll to a certain row (or column).
  *  @param row [in] What row for vertical scrolling, what column for horizontal scrolling.
  *  @param time [in] Time to get to that row.

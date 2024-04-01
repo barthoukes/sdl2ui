@@ -39,6 +39,7 @@
 
 /*------------- Standard includes --------------------------------------------*/
 #include <string>
+#include <memory>
 #include "sdl_button.h"
 
 /// @brief  Create and display buttons.
@@ -87,3 +88,30 @@ public:
 private:
 	bool m_checked;
 };
+
+
+/// @brief  Create and display buttons.
+class CbottomCheckbox : public CbottomButton
+{
+public:
+	CbottomCheckbox( Cdialog *parent,
+			 const Crect &rect,
+			 keybutton code,
+			 textId id=INVALID_TEXT_ID);
+	CbottomCheckbox( Cdialog *parent,
+			 const Crect &rect,
+			 keybutton code,
+			 const std::string &text);
+	virtual ~CbottomCheckbox();
+
+public:
+	bool isChecked() { return m_checked; }
+	void setChecked(bool state) { m_checked=state; }
+	void onPaint(int touch);
+
+private:
+	bool m_checked;
+};
+
+typedef std::shared_ptr<Ccheckbox>  CcheckboxPtr;
+typedef std::shared_ptr<CbottomCheckbox>  CbottomCheckboxPtr;

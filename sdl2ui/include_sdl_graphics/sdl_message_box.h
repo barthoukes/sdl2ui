@@ -39,18 +39,19 @@
 
 /*------------- Standard includes --------------------------------------------*/
 #include <string>
-#include "sdl_keybutton.h"
-#include "sdl_dialog.h"
-#include "timeout.h"
-#include "sdl_button.h"
 #include "sdl_image.h"
+#include "timeout.hpp"
+#include "sdl_dialog.h"
+#include "sdl_button.h"
 
+//! How to show the message box.
 typedef enum
 {
   MB_READY =0,
   MB_OK=1,
   MB_QUIT=2,
   MB_QUIT_OK=3,
+  MB_QUIT_OK_LANG = 7,
   MB_STYLE=7,
   MB_RETURN=8,
   MB_TIME1=16,
@@ -63,7 +64,7 @@ typedef enum
   MB_KEY=2048,
   MB_NETWORK=4096,
   MB_RETURN_IMMEDIATELY =16384,
-  MB_BIG=32768,
+  MB_BIG_BUTTONS=32768,
   MB_START_INVISIBLE=0x10000,
   MB_SELF_DESTRUCT=0x20000,
   MB_PRINTER_READY=0x40000,
@@ -71,18 +72,20 @@ typedef enum
   MB_DISPLAY_IMMEDIATELY=0x100000,
   MB_DARKEN=0x200000,
   MB_TEXT_CENTER=0x400000,
+  MB_TEXT_CENTER_TOP=0x800000,
+  MB_LANGUAGE = 4
 } Ebutton;
 
-
+//! Class for message box, derived from a dialog.
 class CmessageBox : public Cdialog
 {
 public:
-	CmessageBox( const std::string &name);
-	CmessageBox( const std::string &name, textId id);
-	CmessageBox( const std::string &name, const Crect &x, textId id, int FLAGS);
-	CmessageBox( const std::string &name, const Crect &x, const std::string &Text, int FLAGS);
-	CmessageBox( const std::string &name, int x, int y, int w, int h, const std::string &Text, int FLAGS);
-	CmessageBox( const std::string &name, int x, int y, int w, int h, textId id, int FLAGS);
+	explicit CmessageBox( const std::string &name);
+	CmessageBox( const std::string &name, textId title);
+	CmessageBox( const std::string &name, const Crect &x, textId title, int FLAGS);
+	CmessageBox( const std::string &name, const Crect &x, const std::string &title, int FLAGS);
+	CmessageBox( const std::string &name, int x, int y, int w, int h, const std::string &title, int FLAGS);
+	CmessageBox( const std::string &name, int x, int y, int w, int h, textId title, int FLAGS);
 	virtual ~CmessageBox();
 
 public:
@@ -92,27 +95,31 @@ public:
 	virtual void onPaint();
 	virtual void onClearScreen();
 	virtual void onCleanup();
-	virtual Estatus onButton( keymode mod, keybutton sym);
+	virtual Estatus onButton( SDLMod mod, keybutton sym);
 	virtual void onExit();
 	virtual bool onLoop();
 	virtual void clear();
 	keybutton key();
-	virtual void registerMessageBox();
+	virtual void registerMessageBx();
 	virtual bool isSwypeDialog( const Cpoint &p) { (void)p; return false; }
 	void stop(int exitValue);
+	void setFlags( int FLAGS);
+	int getFlags() const;
+	keybutton getObjectKey() const;
+    keybutton getLastKey() const;
 
 private:
 	Ctimeout m_timer;
  	bool m_push;
-	int  m_flags;
 
 protected:
+	int         m_flags;
 	std::string m_text;
-	Cimage  m_ok;
-	Cimage  m_cancel;
-	keybutton m_key;
-
-private:
-	void setFlags( int FLAGS);
+	int         m_factor;
+	CimagePtr   m_ok;
+	CimagePtr   m_cancel;
+	CimagePtr   m_language;
+	keybutton   m_key;
+    keybutton   m_lastKey;
 };
 

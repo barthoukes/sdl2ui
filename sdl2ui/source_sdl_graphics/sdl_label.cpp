@@ -1,5 +1,5 @@
 /*============================================================================*/
-/**  @file      sdl_label.h
+/**  @file      sdl_label.cpp
  **  @ingroup   sdl2ui
  **  @brief		Draw scrollbar.
  **
@@ -48,7 +48,7 @@
 Clabel::Clabel( Cdialog *parent, const Crect &rect, keybutton key)
 : CdialogObject( parent, rect, key)
 , m_label( (key==KEY_NOCHANGE) ? "":Ckeybutton(key).label())
-, m_font( CtextFont("alias"))
+, m_font( CtextFont("label"))
 {
 	calculateSize( rect);
 }
@@ -74,10 +74,10 @@ void Clabel::calculateSize( const Crect &rect)
 	w=(w+7)/8;
 	h=(h+4)/8;
 
-	m_rect.setTop( rect.bottom()-h);
 	m_rect.setHeight(h);
+    m_rect.setWidth( w);
 	m_rect.setLeft( rect.right()-w);
-	m_rect.setWidth( w);
+    m_rect.setTop( rect.bottom()-h);
 }
 
 /** @brief Paint the label.
@@ -90,9 +90,9 @@ void Clabel::onPaint( int touch)
 	{
 		return;
 	}
-	Cbackground( m_parent, m_rect, m_code, Cgraphics::m_defaults.label_background,
+	Cbackground( m_pParent, m_rect, m_code, Cgraphics::m_defaults.label_background,
 			     4, FILL_GRADIENT, Cgraphics::m_defaults.label_background+0x202020).onPaint(0);
-	Ctext txt( m_parent, m_rect, m_code, m_font,
+	Ctext txt( m_pParent, m_rect, m_code, m_font,
 			   m_label, Cgraphics::m_defaults.label_text, GRAVITY_CENTER);
 	txt.onPaint( 0);
 }
@@ -133,4 +133,10 @@ void Clabel::setText( const std::string &txt)
 	m_rect.setHeight(h);
 	m_rect.setLeft( m_rect.right()-w);
 	m_rect.setWidth( w);
+}
+
+void Clabel::setRect( const Crect &rect)
+{
+    m_rect.setLeft( rect.right()-m_rect.width() );
+    m_rect.setTop( rect.bottom()-m_rect.height() );
 }

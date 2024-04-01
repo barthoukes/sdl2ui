@@ -65,11 +65,11 @@ Ccombobox::Ccombobox( Cdialog *parent,
 , m_index(0)
 {
 	Sfont font( CtextFont("small_button"));
-	m_value =new Ctext( m_parent, m_rect, KEY_NOCHANGE, font, "",
+	m_value =new Ctext( m_pParent, m_rect, KEY_NOCHANGE, font, "",
 			                 Cgraphics::m_defaults.button_text,
 			                 GRAVITY_RIGHT_CENTER);
 
-	for ( auto n : names)
+	for ( const std::string &n : names)
 	{
 		m_values.push_back(n);
 	}
@@ -100,11 +100,11 @@ Ccombobox::Ccombobox( Cdialog *parent,
 {
 	Sfont font( CtextFont("small_button"));
 
-	m_value =new Ctext( m_parent, m_rect, KEY_NOCHANGE, font, "",
+	m_value =new Ctext( m_pParent, m_rect, KEY_NOCHANGE, font, "",
 							 Cgraphics::m_defaults.button_text,
 			                 GRAVITY_RIGHT_CENTER);
 
-	for ( auto n : names)
+	for ( const std::string &n : names)
 	{
 		m_values.push_back(n);
 	}
@@ -135,10 +135,11 @@ Ccombobox::Ccombobox( Cdialog *parent,
 : Cbutton( parent, rect, code, font, id, border, gravity, radius, fill)
 , m_index(0)
 {
-	m_textButton =new Ctext( m_parent, m_rect, KEY_NOCHANGE, font, "",
+	m_textButton =std::make_shared<Ctext>( m_pParent, m_rect, KEY_NOCHANGE,
+			                 font, "",
 							 Cgraphics::m_defaults.button_text,
 			                 GRAVITY_RIGHT_CENTER);
-	for ( auto n : names)
+	for ( const std::string &n : names)
 	{
 		m_values.push_back(n);
 	}
@@ -159,10 +160,11 @@ Ccombobox::Ccombobox( Cdialog *parent,
 : Cbutton(parent,rect,code,font,text,border,gravity,radius,fill)
 , m_index(0)
 {
-	m_textButton =new Ctext( m_parent, m_rect, KEY_NOCHANGE, font, "",
+	m_textButton =std::make_shared<Ctext>( m_pParent, m_rect, KEY_NOCHANGE,
+			                 font, "",
 							 Cgraphics::m_defaults.button_text,
 			                 GRAVITY_RIGHT_CENTER);
-	for ( auto n : names)
+	for ( const std::string &n : names)
 	{
 		m_values.push_back(n);
 	}
@@ -201,7 +203,7 @@ void Ccombobox::onPaint( int touch)
 	if ( m_index>=0 && m_index<(int)m_values.size())
 	{
 		std::string i=m_values[m_index];
-		m_value->onPaint( i, touch);
+		m_value->onPaintText( i, touch);
 	}
 }
 

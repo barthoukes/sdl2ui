@@ -1,14 +1,14 @@
 /*============================================================================*/
-/**  @file       sdl_world_interface.h
- **  @ingroup    zhongcan_sdl
- **  @brief		 Default dialog.
+/**  @file       sdl_swype_dialog.h
+ **  @ingroup    zhongcan_user_interface
+ **  @brief		 Swype dialog 1D list
  **
- **  Paint the world, with dialogs and message boxes
+ **  Create a default swype list 1 dimensional.
  **
  **  @author     mensfort
  **
  **  @par Classes:
- **              Cworld
+ **              CswypeDialog
  */
 /*------------------------------------------------------------------------------
  ** Copyright (C) 2011, 2014, 2015
@@ -35,46 +35,48 @@
  ** <http://www.gnu.org/licenses/>
  **===========================================================================*/
 
-#pragma once
-
-/*------------- Standard includes --------------------------------------------*/
-#include <map>
-#include <vector>
 #include <memory>
-#include <string>
-#include <SDL.h>
-#include <pthread.h>
-#include "sdl_dialog_event.h"
-#include "sdl_keybutton.h"
+#include "sdl_rect.h"
 
-class Cdialog;
-class Cgraphics;
-class CmessageBox;
+class SDL_Surface;
+class CdialogObject;
+typedef std::shared_ptr<CdialogObject> CdialogObjectPtr;
 
-class Iworld
+#pragma once
+/*------------- Standard includes --------------------------------------------*/
+/// @brief Structure to hold each texture to paint. We have a queue of this.
+class CswypeObject
 {
 public:
-	Iworld(std::shared_ptr<Cgraphics> mainGraph):
-		m_main_graph(mainGraph) {}
-	virtual ~Iworld() {}
-	virtual std::shared_ptr<Cgraphics> graphics() { return m_main_graph; }
-	virtual void init() = 0;
-	virtual void paintAll() = 0;
-	virtual void setActiveDialog(Cdialog *dialog) = 0;
-	virtual void lock() = 0;
-	virtual void unlock() = 0;
-	virtual void invalidateAll() = 0;
-	virtual void notifyInvalidate() = 0;
-	virtual bool onLoop() = 0;
-	virtual void onCleanup() = 0;
-	virtual Estatus tryButton(keymode mod, keybutton sym) = 0;
-	virtual Cdialog *findDialog( const Cpoint &p) = 0;
-	virtual void registerMessageBox(Cdialog *child) = 0;
-	virtual void unregisterMessageBox(Cdialog *child) = 0;
-	virtual void checkInMainThread() = 0;
+	/**
+	 * @param size [in] Initial size of the object to paint
+	 * @param index [in] What index in an array
+	 * @param destination [in] Where to draw the image in the end
+	 */
+	CswypeObject( const Csize &size, int index, const Crect &destination);
+	virtual ~CswypeObject();
+	void clean();
+	void onPaint( Cpoint &point);
+	bool isValid() const;
+	SDL_Surface *getTexture();
+	CdialogObjectPtr getDialogObject();
+	bool compareSize(const Csize &size) const;
+
+private:
+	CswypeObject(const CswypeObject& o);
+	CswypeObject& operator=(const CswypeObject& o);
 
 public:
-	std::shared_ptr<Cgraphics> m_main_graph;  ///< Main graph for this world
+	static int		totalMemory; ///< Find memory leaks
+	static int		totalPictures;
+
+	int			  	index; ///< Index in the list
+	int				itemId; ///< Item to use.
+	Crect			destination; ///< Where to paint the object should be multiplied by 8.
+
+private:
+	CdialogObjectPtr dialogObject; ///< Reference to object (if needed)
+	SDL_Surface   	*texture; ///< Painted area
 };
 
-/* APPLICATION_DIALOG_H_ */
+typedef std::shared_ptr<CswypeObject> CswypeObjectPtr;

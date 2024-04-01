@@ -39,16 +39,12 @@
 
 /*------------- Standard includes --------------------------------------------*/
 #include <string>
+#include "SDL.h"
 #ifdef USE_SDL2
-/// Key mode
 #include "SDL_keycode.h"
-typedef SDL_Keymod keymode;
-#define SDL_EVENT_RESERVEDA  (SDL_USEREVENT+0)
-#else
-#include "SDL_keysym.h"
-typedef int keymode;
-#endif
 
+typedef SDL_Keymod SDLMod;
+#endif
 
 /// Key constants.
 typedef enum
@@ -70,7 +66,7 @@ typedef enum
 
 	KEY_AMPERSAND   = SDLK_AMPERSAND,
 	KEY_APOSTROPH   = SDLK_QUOTE,
-
+	KEY_BACKQUOTE  = SDLK_BACKQUOTE,
 	KEY_0 			= SDLK_0,
 	KEY_1			= SDLK_1,
 	KEY_2			= SDLK_2,
@@ -119,6 +115,8 @@ typedef enum
 	KEY_Y			= SDLK_y,
 	KEY_Z           = SDLK_z,
 
+	KEY_LEFTPAREN   = SDLK_LEFTPAREN,
+	KEY_RIGHTPAREN  = SDLK_RIGHTPAREN,
 	KEY_BRACKET_OPEN= SDLK_LEFTBRACKET,
 	KEY_BRACKET_CLOSE= SDLK_RIGHTBRACKET,
 
@@ -152,6 +150,10 @@ typedef enum
 	KEY_F10			= SDLK_F10,
 	KEY_F11 		= SDLK_F11,
 	KEY_F12 		= SDLK_F12,
+
+
+
+
 	KEY_LEFT_ALT	= SDLK_LALT,
 	KEY_RIGHT_ALT	= SDLK_RALT,
 	KEY_TABLE = KEY_F3,
@@ -191,9 +193,7 @@ typedef enum
 	KEY_FB = 0xd6,
 	KEY_MERGE = '+',
 	KEY_DOLLAR = SDLK_DOLLAR,
-#ifdef USE_SDL2
-	KEY_EURO = 321,
-#else
+#ifndef USE_SDL2
 	KEY_EURO = SDLK_EURO,
 #endif
 	KEY_PERCENT = 0x25,
@@ -237,7 +237,7 @@ typedef enum
 	KEY_REPLACE = 0x12,
 	KEY_EXTRA = 14,
 	KEY_INCLUDED = 19,
-	KEY_INSERT = 0xd7,
+	KEY_INSERT = SDLK_INSERT, // 0xd7,
 	KEY_SMARTCARD = 0xef,
 	KEY_NOE = '+',
 	KEY_LEFT = SDLK_LEFT,
@@ -311,13 +311,17 @@ typedef enum
 	MP_KEY9 =233,
 	MP_CURSORLEFT =0xd9,
 	MP_CURSORRIGHT =0xda,
-	KEY_NEXT =SDLK_RIGHT,
-	FIRST_ORDERED_ITEM=KEY_SHIFT_F1,
 #ifdef USE_SDL2
-	KEY_BACK =SDLK_KP_BACKSPACE, //SDLK_BACKSPACE,
-	FIRST_ITEM=512,
+	KEY_BACK =SDLK_BACKSPACE,
+	KEY_NEXT =SDLK_RIGHT,
 #else
 	KEY_BACK =SDLK_BREAK,
+	KEY_NEXT =SDLK_RIGHT,
+#endif
+	FIRST_ORDERED_ITEM=KEY_SHIFT_F1,
+#ifdef USE_SDL2
+	FIRST_ITEM=SDLK_AUDIOFASTFORWARD+1,
+#else
 	FIRST_ITEM=SDLK_LAST,
 #endif
 	KEY_NOCHANGE =FIRST_ITEM+50,
@@ -417,7 +421,7 @@ typedef enum
 	KEY_SLIDER,
 	KEY_GRAPH1,
 	KEY_GRAPH80=KEY_GRAPH1+79,
-	KEY_MENU_ITEM1,
+	KEY_MENU_ITEM1, // 1948
 	KEY_MENU_ITEM2,
 	KEY_MENU_ITEM3,
 	KEY_MENU_ITEM4,
@@ -452,17 +456,24 @@ typedef enum
 	KEY_CLIENT20=KEY_CLIENT1+19,
 	KEY_SWYPE_PC1,
 	KEY_SWYPE_PC100 =KEY_SWYPE_PC1+99,
+	KEY_MULTI_SWYPE1,
+	KEY_MULTI_SWYPE1000 =KEY_MULTI_SWYPE1+999,
+	KEY_RESERVATION1,
+	KEY_RESERVATION100 =KEY_RESERVATION1+99,
+    // Specific keys, not suitable for keyboard
+	KEY_REMOVE_ITEM,
 	KEY_UNDEFINED,
-	KEY_MAXIMUM,
-} keybutton;
+	KEY_INVALID,
+    KEY_MAXIMUM,
+}keybutton;
 
 /*------------- Standard includes --------------------------------------------*/
 
 class Ckeybutton
 {
 public:
-	Ckeybutton( keybutton n) { m_key =n; }
-	Ckeybutton( const std::string &str);
+	explicit Ckeybutton( keybutton n);
+	explicit Ckeybutton( const std::string &str);
 	operator std::string();
 	operator keybutton();
 	std::string label();

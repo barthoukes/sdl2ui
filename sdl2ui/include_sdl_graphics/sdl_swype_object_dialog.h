@@ -33,8 +33,9 @@
 
 /*------------- Standard includes --------------------------------------------*/
 #include <queue>
-#include "sdl_dialog.h"
 #include "sdl_swype_dialog.h"
+
+class Cdialog;
 
 /// @brief Scrolling dialog with list of items.
 class CswypeObjectDialog : public CswypeDialog
@@ -44,71 +45,10 @@ public:
 	virtual ~CswypeObjectDialog();
 
 public: // override
-//	virtual void onPaint();
-//	virtual void setCursor( int index);
 	virtual keybutton findButton( const Cpoint &p);
 	virtual int getScrollIndex( keybutton sym);
 	virtual void onPaintUnit( int unit, const Crect &location) =0;
-//	void onPaintBackground( int index, const Crect &location);
-//	void invalidateIndex( int index);
-	CdialogObject * findObject( const Cpoint &p);
-//	int getSpan() { return m_span; }
-//	virtual size_t size();
-//	virtual size_t rows();
-//	virtual size_t maxPosition() { return size(); }
-//	virtual void calculateItemRect();
-	
-public: // New functions.
-//	virtual void makeSureIndexVisible( int index, int time);
-//	virtual bool scrollToIndex( int index, int time);
-//	void setSpan( int x);
-
-private:
-//	virtual void calculateSurfacePosition();
-//	virtual void paintSurfaceTop();
-//	virtual bool paintSurfaceRight();
-//	virtual bool paintSurfaceLeft();
-//	virtual void paintSurfaceBottom();
-
-private:
-//	int			m_span; ///< The number of items horizontal/vertical in a vertical/horizontal scroll dialog.
-
-public:
-//	int			m_realIndex;
+	CdialogObjectPtr findObject( const Cpoint &p);
 };
-
-#if 0
-/** Scroll object, not really usefull for other things than drag &drop.
- */
-class C2DscrollObject : public CdialogObject
-{
-public:
-	C2DscrollObject(Cdialog *parent, int index, const Csize &size)
-    : CdialogObject(parent,Crect(0,0,size.width(),size.height()), KEY_NONE)
-    , m_index(index) { m_dragEnable =true; }
-	~C2DscrollObject() {}
-
-	void setIndex( int index) { m_index=index; }
-	virtual void onPaint( int touch) { (void)touch; }
-	virtual void onPaint( const Cpoint &p, int touch)
-	{
-		(void)touch;
-		if ( !m_visible)
-		{
-			return;
-		}
-		C2DswypeDialog *dlg=dynamic_cast<C2DswypeDialog*>( m_parent);
-		if ( dlg && dlg->m_visible==true)
-		{
-			Crect r( p.left(), p.top(), dlg->width()/dlg->getSpan(), dlg->itemBlocks());
-			dlg->onPaintBackground( m_index, r);
-		}
-	}
-
-private:
-	int m_index; ///< Which object to paint.
-};
-#endif
 
 /* SCROLL_2D_DIALOG_H_ */
-

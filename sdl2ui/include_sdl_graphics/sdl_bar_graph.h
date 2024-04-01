@@ -39,7 +39,7 @@
 
 /*------------- Standard includes --------------------------------------------*/
 #include <string>
-#include "sdl_graphics.h"
+#include <memory>
 #include "sdl_dialog_object.h"
 
 /// @brief  Forward declaration.
@@ -61,7 +61,13 @@ public:
 	void	setColours( int n, colour background);
 	void 	setRange( double minimum, double maximum);
 	void 	rotate();
-	void setColourHelpLines( colour n);
+	void 	setColourHelpLines( colour n);
+	void	setTextHeight(int n);
+	void    setFont(const std::string &font);
+
+private:
+	void paintHelpLines();
+	void addSpacing();
 
 private:
 	std::vector<colour> m_colour; ///< Colour bar.
@@ -76,7 +82,13 @@ private:
 	int					m_textHeight; ///< Height of the text.
 	bool				m_rotate; ///< Rotate the text.
 	colour				m_helpLines; ///< To show the level.
+	std::string			m_font; ///< What font.
+	int					m_left;
+	int					m_right;
+	bool 				m_showValue;
 
 public:
 	static colour		m_defaultColour[8]; ///< Default colours
 };
+
+typedef std::shared_ptr<CbarGraph> CbarGraphPtr;

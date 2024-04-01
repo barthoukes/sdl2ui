@@ -1,17 +1,17 @@
 /*============================================================================*/
-/**  @file      sdl_hand_writer.h
- **  @ingroup   user_interface
- **  @brief		Chinese hand-writing library.
+/**  @file       sdl_rect_group.hpp
+ **  @ingroup    sdl2ui
+ **  @brief		 Rectangle group for our system
  **
- **  Create and show images.
+ **  Rectangle group to find rectangles in an area
  **
  **  @author     mensfort
  **
  **  @par Classes:
- **              ChandWriter
+ **              CrectGroup
  */
 /*------------------------------------------------------------------------------
- ** Copyright (C) 2011, 2014, 2015
+ ** Copyright (C) 2011, 2014, 2019
  ** Houkes Horeca Applications
  **
  ** This file is part of the SDL2UI Library.  This library is free
@@ -38,36 +38,26 @@
 #pragma once
 
 /*------------- Standard includes --------------------------------------------*/
-#include "sdl_image.h"
-#include "zinnia.h"
+#include "sdl_rect.h"
 
-/// @brief  Create and display buttons.
-class ChandWriter : public Cimage
+/// Class for rectangles
+class CrectGroup
 {
 public:
-	ChandWriter( Cdialog *parent, const Crect &rect, const std::string &model, int distance);
-	virtual ~ChandWriter();
+	CrectGroup( const Crect &rect, int horizontal_groups, int vertical_groups);
+	~CrectGroup();
+	int size();
 
 public:
-	void    clearImage();
-	virtual void onPaint( const Cpoint &p);
-	std::string get( size_t n);
-	void addPoint( int x, int y);
-	virtual bool onPaintingStart( const Cpoint &point);
-	virtual bool onPaintingMove( const Cpoint &point);
-	virtual bool onPaintingStop( const Cpoint &point);
-
-private:
-	int 	m_stroke; ///< Index for our stroke.
-	int 	m_distance; ///< Distance for current stroke.
-	int		m_index;	///< which sub-line inside a stroke.
-	bool 	m_started; ///< Is the mouse pressed.
-	Cpoint  m_lastPoint; ///< Last point.
-	zinnia_recognizer_t *m_recognizer;
-	zinnia_character_t 	*m_character;
-	zinnia_result_t 	*m_result;
-	char 	m_value[4];
-	int		m_minimum_distance; ///< Minimum distance between points
+	Crect m_rect;
+	int m_horizontal;
+	int m_vertical;
+	int m_width;
+	int m_height;
+	int m_left;
+	int m_top;
+	int m_bottom;
+	Crect operator[]( int index);
 };
 
-typedef std::shared_ptr<ChandWriter> ChandWriterPtr;
+/* SDL_RECT_GROUP_H_ */

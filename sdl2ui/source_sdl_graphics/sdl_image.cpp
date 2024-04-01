@@ -1,7 +1,7 @@
 /*============================================================================*/
-/**  @file       sdl_image.cpp
+/**  @file       sdl_image_base.cpp
  **  @ingroup    sdl2ui
- **  @brief		 Default dialog.
+ **  @brief		 Shared base for images.
  **
  **  Create a default image.
  **
@@ -36,11 +36,89 @@
  **===========================================================================*/
 
 /*------------- Standard includes --------------------------------------------*/
-
 #include <ctype.h>
-#include <assert.h>
-#include "utf8string.h"
+#include <SDL_image.h>
+
 #include "sdl_image.h"
+#include "utf8string.hpp"
+#include "var_string.hpp"
+
+const std::map<std::string, EimageStyle> Cimage::m_monoImages =
+{
+    { "abc", IMAGE_BACKGROUND_COLOUR },
+    { "address_book", IMAGE_BACKGROUND_COLOUR },
+	{ "advertisement", IMAGE_BACKGROUND_COLOUR },
+	{ "asset", IMAGE_BACKGROUND_COLOUR },
+	{ "back",  IMAGE_BACKGROUND_COLOUR },
+    { "bag", IMAGE_BACKGROUND_COLOUR },
+    { "button_mobile", IMAGE_BACKGROUND_COLOUR },
+    { "cancel", IMAGE_CANCEL_COLOUR },
+    { "check", IMAGE_BACKGROUND_COLOUR },
+    { "delivery", IMAGE_BACKGROUND_COLOUR },
+    { "down", IMAGE_BACKGROUND_COLOUR },
+    { "drawer", IMAGE_BACKGROUND_COLOUR },
+    { "enter", IMAGE_OK_COLOUR },
+    { "eraser", IMAGE_BACKGROUND_COLOUR },
+    { "euro", IMAGE_BACKGROUND_COLOUR },
+    { "floorplan", IMAGE_BACKGROUND_COLOUR },
+    { "graph", IMAGE_BACKGROUND_COLOUR },
+    { "height_min", IMAGE_BACKGROUND_COLOUR },
+    { "height_plus", IMAGE_BACKGROUND_COLOUR },
+    { "icon_123_", IMAGE_BACKGROUND_COLOUR },
+	{ "icon_add_part", IMAGE_BACKGROUND_COLOUR },
+    { "icon_backspace", IMAGE_BACKGROUND_COLOUR },
+    { "icon_calculator", IMAGE_BACKGROUND_COLOUR  },
+	{ "icon_cancel", IMAGE_BACKGROUND_COLOUR },
+    { "icon_colour", IMAGE_BACKGROUND_COLOUR },
+    { "icon_credit", IMAGE_BACKGROUND_COLOUR },
+	{ "icon_discount", IMAGE_BACKGROUND_COLOUR },
+    { "icon_disk", IMAGE_BACKGROUND_COLOUR },
+	{ "icon_eye", IMAGE_BACKGROUND_COLOUR },
+	{ "icon_info", IMAGE_BACKGROUND_COLOUR },
+	{ "icon_inside", IMAGE_BACKGROUND_COLOUR },
+	{ "icon_invoice", IMAGE_BACKGROUND_COLOUR },
+    { "icon_key", IMAGE_BACKGROUND_COLOUR },
+    { "icon_magnify", IMAGE_BACKGROUND_COLOUR },
+    { "icon_manager_key", IMAGE_BACKGROUND_COLOUR },
+	{ "icon_menu_copy", IMAGE_BACKGROUND_COLOUR },
+	{ "icon_menu_remove", IMAGE_BACKGROUND_COLOUR },
+	{ "icon_money_table", IMAGE_BACKGROUND_COLOUR },
+	{ "icon_more", IMAGE_BACKGROUND_COLOUR },
+    { "icon_move", IMAGE_BACKGROUND_COLOUR },
+	{ "icon_person_add", IMAGE_BACKGROUND_COLOUR },
+	{ "icon_shop", IMAGE_BACKGROUND_COLOUR },
+    { "icon_shop_add", IMAGE_BACKGROUND_COLOUR },
+	{ "icon_sort", IMAGE_BACKGROUND_COLOUR },
+    { "icon_stamp", IMAGE_BACKGROUND_COLOUR },
+    { "icon_statiegeld", IMAGE_BACKGROUND_COLOUR },
+    { "icon_takephone", IMAGE_BACKGROUND_COLOUR },
+    { "icon_tax", IMAGE_BACKGROUND_COLOUR },
+    { "icon_transfer", IMAGE_BACKGROUND_COLOUR },
+	{ "icon_translate", IMAGE_BACKGROUND_COLOUR },
+	{ "icon_twin", IMAGE_BACKGROUND_COLOUR },
+    { "icon_type", IMAGE_BACKGROUND_COLOUR },
+	{ "icon_usb", IMAGE_BACKGROUND_COLOUR },
+	{ "icon_visible", IMAGE_BACKGROUND_COLOUR },
+	{ "icon_waiter_key", IMAGE_BACKGROUND_COLOUR },
+	{ "icon_wallet", IMAGE_BACKGROUND_COLOUR },
+    { "icon_wok", IMAGE_BACKGROUND_COLOUR },
+    { "languages", IMAGE_BACKGROUND_COLOUR },
+    { "left", IMAGE_BACKGROUND_COLOUR },
+    { "menu", IMAGE_BACKGROUND_COLOUR },
+    { "new_menu", IMAGE_BACKGROUND_COLOUR },
+    { "printer", IMAGE_BACKGROUND_COLOUR },
+    { "right", IMAGE_BACKGROUND_COLOUR },
+    { "screensaver", IMAGE_BACKGROUND_COLOUR },
+    { "settings", IMAGE_BACKGROUND_COLOUR },
+    { "shutdown", IMAGE_BACKGROUND_COLOUR },
+    { "sitin", IMAGE_BACKGROUND_COLOUR },
+    { "split", IMAGE_BACKGROUND_COLOUR },
+    { "trash", IMAGE_BACKGROUND_COLOUR },
+    { "uncheck", IMAGE_BACKGROUND_COLOUR },
+    { "up", IMAGE_BACKGROUND_COLOUR },
+    { "width_min", IMAGE_BACKGROUND_COLOUR },
+    { "width_plus", IMAGE_BACKGROUND_COLOUR },
+};
 
 /*============================================================================*/
 ///
@@ -53,9 +131,9 @@
 ///
 /*============================================================================*/
 Cimage::Cimage( Cdialog *parent, const Crect &rect, keybutton code,
-		        const std::string &icon, EborderType border, int margin, const std::string &label)
+		        const std::string &icon, EborderType border, int margin)
 : CdialogObject( parent, rect, code)
-, m_imageAlign( GRAVITY_LEFT)
+, m_imageAlign( GRAVITY_LEFT_CENTER)
 , m_parent(NULL)
 , m_noBackground(false)
 , m_border(border)
@@ -72,31 +150,14 @@ Cimage::Cimage( Cdialog *parent, const Crect &rect, keybutton code,
 			    FILL_CIRCULAR,
 			    Cgraphics::m_defaults.button_background2)
 , m_imageStyle( IMAGE_DEFAULT)
-, m_imageColour(0)
+, m_imageColour(0x006060)
 {
-	m_label.setText(label);
+    m_label.setVisible(false);
 	if ( border ==BORDER_NONE)
 	{
 		m_noBackground =true;
 	}
-	int sz =8*gMin( rect.width(), rect.height());
-
-	m_image =icon;
-	if ( icon.size() ==0)
-	{
-		setVisible(false);
-	}
-	size_t pos=m_image.find( "*", 0);
-
-	if (pos!=std::string::npos) // Last character after the dot
-	{
-		char s[16];
-		sz-=2*m_margin;
-		sz-=(sz&7);
-		sprintf( s, "%d", sz);
-		m_image.erase( pos, 1);
-		m_image.insert( pos, s);
-	}
+	setImage(icon, m_imageAlign);
 	m_path =Cgraphics::m_defaults.image_path;
 }
 
@@ -120,11 +181,7 @@ void Cimage::close()
 {
 	if ( m_surface !=NULL)
 	{
-#ifdef USE_SDL2
-		SDL_DestroyTexture( m_surface);
-#else
 		SDL_FreeSurface( m_surface);
-#endif
 		m_surface =NULL;
 	}
 }
@@ -139,59 +196,27 @@ void Cimage::load( const std::string &fileName)
 	{
 		std::string str=Cgraphics::m_defaults.image_path;
 		str +=fileName;
-#ifdef USE_SDL2
-		SDL_Surface *surface =IMG_Load( str.c_str());
-		m_surface =NULL;
-		if (surface)
-		{
-			SDL_CreateTextureFromSurface(m_graphics->getRenderer(), surface);
-			SDL_FreeSurface(surface);
-		}
-#else
 		m_surface =IMG_Load( str.c_str());
-#endif
 	}
 	else
 	{
-#ifdef USE_SDL2
-		SDL_Surface *surface =IMG_Load( fileName.c_str());
-		m_surface =NULL;
-		if (surface)
-		{
-			SDL_CreateTextureFromSurface(m_graphics->getRenderer(), surface);
-			SDL_FreeSurface(surface);
-		}
-#else
 		m_surface =IMG_Load( fileName.c_str());
-#endif
 	}
 	if ( m_surface !=NULL)
 	{
-#ifdef USE_SDL2
-		m_size = m_graphics->textureSize( m_surface);
-#else
 		m_size.setHeight( m_surface->h);
 		m_size.setWidth( m_surface->w);
-#endif
-		//m_rect.setSize( Csize( m_surface->w, m_surface->h));
 	}
 	else
 	{
 		m_size.setHeight( 0);
 		m_size.setWidth( 0);
-		//m_rect.setSize( Csize( 0,0));
 	}
 }
 
 void Cimage::save( const std::string &fileName)
 {
-#ifdef USE_SDL2
-	assert(0);
-	//PixelFormat mask = GetMask(format);
-	//SDL_Renderer *m_renderer; ///< Reders a window.
-#else
 	SDL_SaveBMP( m_surface, fileName.c_str());
-#endif
 }
 
 /*============================================================================*/
@@ -205,7 +230,7 @@ void Cimage::paintBackground( int touch)
 	{
 		int margin =m_background.m_borderWidth;
 		m_background.m_borderWidth -=touch/8;
-		m_background.m_rect =m_rect;
+		m_background.setRect(m_rect);
 		m_background.onPaint( touch);
 		m_background.m_borderWidth =margin;
 	}
@@ -263,17 +288,17 @@ void Cimage::paintBorder( int touch)
 	int x1 = (m_rect.left() << 3), y1 = (m_rect.top() << 3);
 	int x2 = (m_rect.width() << 3) + x1, y2 = (m_rect.height() << 3) + y1;
 
-	m_graphics->lock();
+	m_pGraphics->lock();
 	for (int a=0; a<linewidth; a++)
 	{
-		m_graphics->setColour( col1 );
-		m_graphics->line( x1+a, y1+a, x2-a-1, y1+a);
-		m_graphics->line( x2-a-1, y1+a+1, x2-a-1, y2-a-1);
-		m_graphics->setColour( col2 );
-		m_graphics->line( x2-a-1, y2-a-1, x1+a, y2-a-1);
-		m_graphics->line( x1+a, y2-a-1, x1+a, y1+a+1);
+		m_pGraphics->setColour( col1 );
+		m_pGraphics->line( x1+a, y1+a, x2-a-1, y1+a);
+		m_pGraphics->line( x2-a-1, y1+a+1, x2-a-1, y2-a-1);
+		m_pGraphics->setColour( col2 );
+		m_pGraphics->line( x2-a-1, y2-a-1, x1+a, y2-a-1);
+		m_pGraphics->line( x1+a, y2-a-1, x1+a, y1+a+1);
 	}
-	m_graphics->unlock();
+	m_pGraphics->unlock();
 }
 
 /*============================================================================*/
@@ -288,58 +313,56 @@ void Cimage::paintImage( int touch)
 	int y1 = (m_rect.top() << 3);
 	int x2 = (m_rect.width() << 3) + x1;
 	int y2 = (m_rect.height() << 3) + y1;
+	int sizex =0;
+	int sizey =0;
+
+	if ( m_size.width()==0)
+	{
+		SDL_Surface *bitmap =m_pGraphics->findImage( m_image, (m_imageStyle!=IMAGE_DEFAULT));
+		if (  bitmap)
+		{
+			sizex=bitmap->w;
+			sizey=bitmap->h;
+		}
+	}
+	else
+	{
+		sizex=m_size.width()*8-2*m_margin;
+		sizey=m_size.height()*8-2*m_margin;
+	}
 	x1 +=m_margin;
 	x2 -=m_margin;
 	y1 +=m_margin;
 	y2 -=m_margin;
-	Csize sz(0,0);
-
-	sdlTexture *bitmap = m_surface ? m_surface:m_graphics->findImage( m_image);
-	if ( bitmap == NULL)
+	if ( sizex>x2-x1)
 	{
-		return;
+		sizex=x2-x1;
 	}
-	switch ( m_imageAlign)
+	if ( sizey>y2-y1)
 	{
-	case GRAVITY_RESIZE:
-	case GRAVITY_BEHIND_TEXT:
-		sz =Csize( x2-x1, y2-y1);
-		break;
-	default:
-#ifdef USE_SDL2
-		sz =m_graphics->textureSize(bitmap);
-#else
-		sz =Csize( bitmap->w, bitmap->h);
-#endif
-		break;
-	}
-	if ( sz.width() > x2-x1)
-	{
-		sz.setWidth(x2-x1);
-	}
-	if ( sz.height() > y2-y1)
-	{
-		sz.setHeight(y2-y1);
+		sizey=y2-y1;
 	}
 	// x
 	switch( m_imageAlign)
 	{
 	case GRAVITY_LEFT:
+    case GRAVITY_LEFT_TOP:
 	case GRAVITY_LEFT_CENTER:
 	case GRAVITY_LEFT_BOTTOM:
 		break;
 
+    case GRAVITY_RIGHT:
+    case GRAVITY_RIGHT_TOP:
 	case GRAVITY_RIGHT_CENTER:
 	case GRAVITY_RIGHT_BOTTOM:
-	case GRAVITY_RIGHT:
-		x1=x2-sz.width();
+		x1=x2-sizex;
 		break;
 
 	default:
 	case GRAVITY_CENTER:
 	case GRAVITY_TOP_CENTER:
 	case GRAVITY_BOTTOM_CENTER:
-		x1=(x1+x2-sz.width())/2;
+		x1=(x1+x2)/2-(sizex/2);
 		break;
 	}
 	// y
@@ -348,45 +371,53 @@ void Cimage::paintImage( int touch)
 	case GRAVITY_LEFT:
 	case GRAVITY_RIGHT:
 	case GRAVITY_TOP_CENTER:
+	case GRAVITY_LEFT_TOP:
+	case GRAVITY_RIGHT_TOP:
 		break;
 
 	default:
 	case GRAVITY_LEFT_CENTER:
 	case GRAVITY_RIGHT_CENTER:
 	case GRAVITY_CENTER:
-		y1=(y1+y2)/2-(sz.height()/2);
+		y1=(y1+y2)/2-(sizey/2);
 		break;
 
 	case GRAVITY_LEFT_BOTTOM:
 	case GRAVITY_RIGHT_BOTTOM:
 	case GRAVITY_BOTTOM_CENTER:
-		y1=y2-sz.height();
+		y1=y2-sizey;
 		break;
 	}
-#ifdef USE_SDL2
-	m_graphics->renderTexture( bitmap, x1, y1, sz.width(), sz.height());
-#else
-	m_graphics->renderSurface( bitmap, x1, y1, sz.width(), sz.height());
-#endif
+	if ( m_surface)
+	{
+		m_pGraphics->surface( m_surface, x1,y1,x2-x1,y2-y1);
+	}
+	else
+	{
+		switch ( m_imageStyle)
+		{
+		case IMAGE_CANCEL_COLOUR:
+		    m_pGraphics->imageColour( m_image, x1, y1, x2, y2, 0x00d00060);
+		    break;
+		case IMAGE_OK_COLOUR:
+		    m_pGraphics->imageColour( m_image, x1, y1, x2, y2, 0x0000ff06);
+		    break;
+		case IMAGE_DEFAULT:
+			m_pGraphics->image( m_image, x1, y1, x2, y2);
+			break;
+		case IMAGE_MONO_COLOUR:
+			m_pGraphics->imageColour( m_image, x1, y1, x2, y2, m_imageColour);
+			break;
+		case IMAGE_INVERSE_COLOUR:
+			m_pGraphics->imageInverse( m_image, x1, y1, x2, y2, m_imageColour);
+			break;
+		case IMAGE_BACKGROUND_COLOUR:
+            m_pGraphics->imageWithColourChart( m_image, x1, y1, x2, y2);
+            //m_pGraphics->imageWithBackgroundColour( m_image, x1, y1, x2, y2);
+            break;
+		}
+	}
 }
-//	else
-//	{
-//		switch ( m_imageStyle)
-//		{
-//		case IMAGE_DEFAULT:
-//			m_graphics->image( m_image, x1, y1, x2, y2);
-//			//m_graphics->image( m_image, x1, y1, x1+sizex+1, y1+sizex+1);
-//			break;
-//		case IMAGE_COLOUR:
-//			m_graphics->imageColour( m_image, x1, y1, x2, y2, m_imageColour);
-//			//m_graphics->imageColour( m_image, x1, y1, x1+sizex+1, y1+sizex+1, m_imageColour);
-//			break;
-//		case IMAGE_INVERSE_COLOUR:
-//			m_graphics->imageInverse( m_image, x1, y1, x2, y2, m_imageColour);
-//			//m_graphics->imageInverse( m_image, x1, y1, x1+sizex+1, y1+sizex+1, m_imageColour);
-//		}
-//	}
-//}
 
 /*============================================================================*/
 ///
@@ -412,7 +443,7 @@ void Cimage::onPaint( int touch)
 	// Draw label
 	m_label.onPaint( touch);
 	// Set mouse touch.
-	m_graphics->setCode( m_rect, m_code);
+	m_pGraphics->setKey( m_rect, m_code);
 }
 
 /*============================================================================*/
@@ -426,30 +457,52 @@ void Cimage::onPaint( int touch)
 /*============================================================================*/
 void Cimage::setImage( const std::string &image, Egravity horizontal, int variable_size)
 {
-	if ( image.size()==0)
-	{
-		m_visible=false;
-		return;
-	}
-	m_image =image;
-	m_imageAlign =horizontal;
-	size_t pos=m_image.find( "*", 0);
+    if ( image.size()==0)
+    {
+        m_image = image;
+        m_visible=false;
+        return;
+    }
+    m_imageAlign =horizontal;
 
-	m_visible =true; //(image.size()!=0);
-	if (pos!=std::string::npos) // Last character after the dot
-	{
-		char s[16];
-		if ( variable_size<=0)
-		{
-			variable_size =m_rect.height();
-		}
-		//variable_size=(variable_size*8-m_margin*2)&0xfff8;
-		sprintf( s, "%d", variable_size*8);
-		m_image.erase( pos, 1);
-		m_image.insert( pos, s);
-	}
+    size_t pos = image.find( "*", 0);
+    m_visible= true;
+
+    if (pos != std::string::npos) // Last character after the dot
+    {
+        std::string icon = image.substr(0, pos);
+        if ( Cgraphics::m_defaults.use_mono_images)
+        {
+            auto iter = m_monoImages.find(icon);
+            if ( iter != m_monoImages.end())
+            {
+                m_imageStyle = iter->second;
+            }
+        }
+        if ( variable_size<=0)
+        {
+            variable_size = 8*gMin( m_rect.width(), m_rect.height());
+        }
+        else
+        {
+            variable_size <<=3;
+        }
+        variable_size-=2*m_margin;
+        variable_size-=(variable_size&7);
+        var_string s(icon);
+        s << variable_size << ".png";
+        m_image = s.string();
+    }
+    else
+    {
+        m_image = image;
+    }
 }
 
+void Cimage::clear()
+{
+	m_image ="";
+}
 
 /*============================================================================*/
 ///
@@ -507,4 +560,10 @@ void Cimage::setStyle( EimageStyle style, colour col)
 {
 	m_imageStyle =style;
 	m_imageColour =col;
+}
+
+void Cimage::setRect( const Crect &rect)
+{
+    CdialogObject::setRect(rect);
+    m_label.setRect(rect);
 }

@@ -61,10 +61,12 @@ Crectangle::Crectangle( Cdialog *parent,
 {
 }
 
+/*---------------------------------------------------------------------------*/
 Crectangle::~Crectangle()
 {
 }
 
+/*---------------------------------------------------------------------------*/
 /// @brief Change style rectangle.
 void Crectangle::setFillStyle( EfillType pattern)
 {
@@ -79,7 +81,7 @@ void Crectangle::setFillStyle( EfillType pattern)
 void Crectangle::onPaint( int touch)
 {
 	(void)touch;
-	if ( m_graphics ==NULL)
+	if ( m_pGraphics ==NULL)
 	{
 		return;
 	}
@@ -127,19 +129,20 @@ void Crectangle::onPaint( int touch)
 	int x1 = ( m_rect.left() << 3 ), y1 = (m_rect.top() << 3);
 	int x2 = ( m_rect.right() << 3), y2 = (m_rect.bottom() << 3);
 
-	m_graphics->lock();
+	m_pGraphics->lock();
 	for (int a=0; a<linewidth; a++)
 	{
-		m_graphics->setColour( col1 );
-		m_graphics->line( x1+a, y1+a, x2-a-1, y1+a);
-		m_graphics->line( x2-a-1, y1+a+1, x2-a-1, y2-a-1);
-		m_graphics->setColour( col2 );
-		m_graphics->line( x2-a-1, y2-a-1, x1+a, y2-a-1);
-		m_graphics->line( x1+a, y2-a-1, x1+a, y1+a+1);
+		m_pGraphics->setColour( col1 );
+		m_pGraphics->line( x1+a, y1+a, x2-a-1, y1+a);
+		m_pGraphics->line( x2-a-1, y1+a+1, x2-a-1, y2-a-1);
+		m_pGraphics->setColour( col2 );
+		m_pGraphics->line( x2-a-1, y2-a-1, x1+a, y2-a-1);
+		m_pGraphics->line( x1+a, y2-a-1, x1+a, y1+a+1);
 	}
-	m_graphics->unlock();
+	m_pGraphics->unlock();
 }
 
+/*---------------------------------------------------------------------------*/
 void Crectangle::setBackground( EfillType pattern, colour background1, colour foreground2, colour background2)
 {
 	m_square.setFillStyle( pattern);
@@ -148,7 +151,8 @@ void Crectangle::setBackground( EfillType pattern, colour background1, colour fo
 	m_border2 =background1;
 }
 
-void Crectangle::setCode( keybutton key)
+/*---------------------------------------------------------------------------*/
+void Crectangle::setKey( keybutton key)
 {
-	m_square.setCode( key);
+	m_square.setKey( key);
 }

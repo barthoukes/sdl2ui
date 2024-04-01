@@ -36,7 +36,6 @@
  **===========================================================================*/
 
 /*------------- Standard includes --------------------------------------------*/
-#include <assert.h>
 #include "sdl_surface.h"
 #include "sdl_dialog_object.h"
 #include <string>
@@ -96,7 +95,7 @@ void CtextSurface::createSurfaces( TTF_Font *font)
 	{
 		// Log.write( "String %d %s", a, m_split[a].c_str());
 		// Split one line into words and see how many words do fit...
-		CtextSplitter word( m_split[lineNr], " ", "\t");
+		CtextSplitter word( m_split[lineNr], " ", "\t", false);
 		if ( word.size() ==0)
 		{
 			continue;
@@ -110,7 +109,7 @@ void CtextSurface::createSurfaces( TTF_Font *font)
 			for ( i=0; i<(int)word[0].size(); i++)
 			{
 				// Check how many characters do fit!
-				fit =word[0].sub( 0,i+1);
+				fit =word[0].subStr( 0,i+1);
 				TTF_SizeUTF8( font, fit.c_str(), &w, &h);
 				if ( w>m_rect.width())
 				{
@@ -118,20 +117,19 @@ void CtextSurface::createSurfaces( TTF_Font *font)
 					{
 						//Log.write( "Even one character does not fit!!");
 						m_lock.unlock();
+						m_doesFit = false;
 						return;
 					}
-					fit =word[0].sub( 0,i);
+					fit =word[0].subStr( 0,i);
 					bitmap =blend( fit, m_textColour, font, true);
-					//bitmap =TTF_RenderUTF8_Blended( font ,fit.c_str(), m_textColour);
 					if ( bitmap ==NULL)
 					{
-						// ( "CtextSurface::CtextSurface  Cannot create a surface to paint on!!");
 						// Something wrong in memory, skip the rest.
 						break;
 					}
 					m_height +=bitmap->h+m_vertical_spacing;
 					m_index +=fit.size();
-					fit =word[0].sub( i);
+					fit =word[0].subStr( i);
 					m_split.insert( lineNr+1, fit);
 					m_surfaces.push_back( bitmap);
 					break;
@@ -170,7 +168,7 @@ void CtextSurface::createSurfaces( TTF_Font *font)
 			if ( w>m_rect.width() && m_rect.width() !=0)
 			{
 				// This word doesn't fit anymore.
-				fit =fit.sub( 0, length);
+				fit =fit.subStr( 0, length);
 				bitmap =blend( fit, m_textColour, font, false);
 				//bitmap =TTF_RenderUTF8_Blended( font ,fit.c_str(), m_textColour);
 				if ( bitmap ==NULL)
@@ -248,11 +246,11 @@ SDL_Surface * CtextSurface::blend( utf8string &text, SDL_Color fg, TTF_Font *fon
 		}
 		else
 		{
-			t =text.sub( 0, m_cursor-m_index);
+			t =text.subStr( 0, m_cursor-m_index);
 			TTF_SizeUTF8( font, t.c_str(), &w1, &h1);
 		}
 		// Find out end position cursor.
-		t =text.sub( 0, m_cursor-m_index+1);
+		t =text.subStr( 0, m_cursor-m_index+1);
 		TTF_SizeUTF8( font, t.c_str(), &w2, &h2);
 		if ( w2==w1) { w1=w1-1; }
 
@@ -290,31 +288,6 @@ SDL_Surface * CtextSurface::blend( utf8string &text, SDL_Color fg, TTF_Font *fon
 }
 
 /*==============================================================================
-**              CtextSurface::createSurface
-**============================================================================*/
-///
-/// @brief		Calculate a surface.
-///
-/// @post       Surface calculated.
-///
-/// @remarks    TYPED
-///
-/*============================================================================*/
-void CtextSurface::createSurface()
-{
- //   int bmask = 0x000000ff;
-//    int gmask = 0x0000ff00;
-//    int rmask = 0x00ff0000;
-////    int amask = 0xff000000;
-//	m_surface =SDL_CreateRGBSurface( SDL_SWSURFACE,
-//									 m_rect.width(), m_rect.height(), 32,
-//									 rmask, gmask, bmask, amask);
-	//SDL_SetAlpha(m_surface,  SDL_SRCALPHA, SDL_ALPHA_TRANSPARENT);
-	//SDL_SetAlpha(m_surface, SDL_SRCALPHA|SDL_RLEACCEL, 255);
-	//SDL_SetAlpha(m_surface,  0, 0);
-}
-
-/*==============================================================================
 **              CtextSurface::CtextSurface
 **============================================================================*/
 ///
@@ -325,39 +298,61 @@ void CtextSurface::createSurface()
 /// @remarks    TYPED
 ///
 /*============================================================================*/
-CtextSurface::CtextSurface( std::shared_ptr<Cgraphics> graphics,
+CtextSurface::CtextSurface( Cgraphics *graphics,
 		                    const std::string &text,
 		                    const Crect &rect,
 		                    int cursor,
 		                    Egravity gravity,
 		                    colour textColour,
 		                    colour cursorColour,
-		                    TTF_Font *font)
+		                    TTF_Font *font,
+							bool renderIfFit)
 : m_height(0)
 , m_gravity( gravity)
-, m_split( text, ",", "\n")
+, m_split( text, ",", "\n", false)
 , m_rect(rect)
+, m_vertical_spacing(1)
 , m_graphics( graphics)
+, m_index(0)
 , m_cursor(cursor)
 , m_owner(false)
 , m_blend(true)
+, m_doesFit(true)
 {
 	(void)cursor;
 	setColour( textColour, cursorColour);
 	std::string fit;
-	// No cursor for now...
-	// Is the cursor in the current line?
-	//createSurface();
-
-	//if ( m_surface ==NULL)
-	//{
-	///	Log.error( "CtextSurface::CtextSurface  Cannot create a final surface to paint on!!");
-		// Something wrong in memory, should skip the rest.
-	//}
-
-	createSurfaces( font);
-	renderSurfaces();
+	// @todo No cursor for now...
+    createSurfaces( font);
+	if (renderIfFit && !isFit())
+	{
+	    m_doesFit = false;
+	}
+	else
+	{
+		m_doesFit = true;
+		renderSurfaces();
+	}
 	clean();
+}
+
+/*==============================================================================
+**              CtextSurface::check if the picture fits
+**============================================================================*/
+bool CtextSurface::isFit()
+{
+	if ( m_rect.height() < m_height)
+	{
+		return(false);
+	}
+	for (SDL_Surface *surface: m_surfaces)
+	{
+	    if (surface->w > m_rect.width())
+	    {
+	    	return(false);
+	    }
+	}
+	return (true);
 }
 
 /*==============================================================================
@@ -403,6 +398,7 @@ void CtextSurface::renderSurfaces()
 		switch ( m_gravity)
 		{
 		case GRAVITY_RIGHT_CENTER:
+		case GRAVITY_RIGHT_TOP:
 		case GRAVITY_RIGHT:
 		case GRAVITY_RIGHT_BOTTOM:
 			x_offset =m_rect.width()-s->w;
@@ -414,6 +410,8 @@ void CtextSurface::renderSurfaces()
 			break;
 		case GRAVITY_LEFT_BOTTOM:
 		case GRAVITY_LEFT_CENTER:
+		case GRAVITY_LEFT_TOP:
+		case GRAVITY_LEFT:
 		default:
 			x_offset =0;
 			break;
@@ -421,7 +419,7 @@ void CtextSurface::renderSurfaces()
 		int hblit =( pixels_left >=s->h) ? s->h:pixels_left;
 		if (hblit >0)
 		{
-			m_graphics->renderSurface( *a, m_rect.left()+x_offset, m_rect.top()+top_offset);
+			m_graphics->surface( *a, m_rect.left()+x_offset, m_rect.top()+top_offset );
 			pixels_left -=hblit;
 			top_offset +=hblit+m_vertical_spacing;
 		}
@@ -448,6 +446,10 @@ void CtextSurface::clean()
 		SDL_FreeSurface( m_surfaces[a]);
 	}
 	m_surfaces.clear();
+	if ( m_owner && m_graphics)
+	{
+		delete m_graphics;
+	}
 }
 
 /** @brief		Create text surface.
@@ -463,7 +465,7 @@ CtextSurface::CtextSurface( const std::string &text,
 		                    )
 : m_height( size.height())
 , m_gravity( gravity)
-, m_split( text, ",", "\n")
+, m_split( text, ",", "\n", false)
 , m_rect(0,0,0,0) // unused.
 , m_vertical_spacing(1)
 , m_graphics(NULL)
@@ -471,13 +473,13 @@ CtextSurface::CtextSurface( const std::string &text,
 , m_cursor(-1)
 , m_owner(false)
 , m_blend(false)
+, m_doesFit(true)
 {
 	m_textColour.b =8;
 	m_textColour.r =8;
 	m_textColour.g =8;
-#ifndef USE_SDL2
 	m_textColour.unused =128;
-#endif
+
 	createSurfaces( font);
 	createGraphics();
 	renderSurfaces();
@@ -501,19 +503,18 @@ void CtextSurface::createGraphics()
 	int a;
 	for ( a=0; a<(int)m_surfaces.size(); a++)
 	{
-		Csize sz(m_surfaces[a]->w, m_surfaces[a]->h);
-		hght +=sz.height();
+		hght +=m_surfaces[a]->h;
 		if ( a) hght +=m_vertical_spacing;
-		if ( wdth<sz.width())
+		if ( wdth<m_surfaces[a]->w)
 		{
-			wdth =sz.width();
+			wdth =m_surfaces[a]->w;
 		}
 	}
 	m_graphics =NULL;
 	m_rect =Crect(0,0, wdth, hght);
 	if ( wdth>0 && hght>0)
 	{
-		m_graphics =std::make_shared<Cgraphics>( Csize( wdth, hght), false);
+		m_graphics =new Cgraphics( Csize( wdth, hght), false);
 		m_graphics->init();
 		m_owner =true;
 	}

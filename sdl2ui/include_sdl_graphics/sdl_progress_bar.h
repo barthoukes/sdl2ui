@@ -39,10 +39,8 @@
 
 /*------------- Standard includes --------------------------------------------*/
 #include <string>
-#include "sdl_graphics.h"
 #include "sdl_slider.h"
-#include "sdl_dialog_object.h"
-#include "timeout.h"
+#include "timeout.hpp"
 
 /// @brief  Forward declaration.
 class Cdialog;

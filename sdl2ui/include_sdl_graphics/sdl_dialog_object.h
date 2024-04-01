@@ -41,12 +41,12 @@
 #include <string>
 #include <vector>
 #include <memory>
-#ifdef USE_SDL2
-#else
-#include "sdl_keybutton.h"
-#endif
+
 #include "sdl_rect.h"
-#include "sdl_graphics.h"
+#include "sdl_keybutton.h"
+
+class Cgraphics;
+class Cdialog;
 
 // Touch speeds, may be used for showing pressed buttons
 #define NO_TOUCH		  0
@@ -57,8 +57,10 @@
 typedef enum
 {
 	GRAVITY_LEFT,			///< Object to the left.
+    GRAVITY_LEFT_TOP,       ///< Object on top left.
 	GRAVITY_LEFT_CENTER,	///< Object left center.
 	GRAVITY_LEFT_BOTTOM,    ///< Object left bottom.
+    GRAVITY_RIGHT_TOP,      ///< Object on top right.
 	GRAVITY_RIGHT_CENTER,	///< Object right center.
 	GRAVITY_RIGHT_BOTTOM,	///< Object right bottom.
 	GRAVITY_CENTER,			///< Object in middle.
@@ -72,52 +74,75 @@ typedef enum
 
 class Cdialog;
 
-/// @brief	Root for all painted objects on screen.
+/// @brief	Root for all painteonPaintd objects on screen.
 class CdialogObject
 {
 public:
-	CdialogObject( Cdialog *parent, const Crect &rect, keybutton code);
+	CdialogObject( Cdialog *pParent, const Crect &rect, keybutton code);
+	CdialogObject( const CdialogObject & ) = delete;
+
 	virtual ~CdialogObject();
 
 public:
 	/// Paint the object.
 	virtual void onPaint( int touch) =0;
-	virtual void onPaint( const Cpoint &p, int touch);
-	void enableDrag() { m_dragEnable=true; }
-	void enablePainting() { m_painting=true; }
-	void setRect( const Crect &rect) { m_rect=rect; }
-	void setLeft( int left) { m_rect.setLeft(left); }
-	int height() { return m_rect.height(); }
-	int width() { return m_rect.width(); }
-	int left() { return m_rect.left(); }
-	int right() { return m_rect.right(); }
-	int top() { return m_rect.top(); }
-	int bottom() { return m_rect.bottom(); }
-	void 	setVisible( bool visible) { m_visible=visible; }
-	bool	isVisible() { return m_visible; }
+	void onPaint( const Cpoint &p, int touch);
+	virtual void enableDrag();
+	virtual void disableDrag();
+	virtual void enablePainting();
+	virtual Crect getRect() const;
+	virtual void setRect( const Crect &rect);
+	virtual void setLeft( int left);
+    virtual void setTop( int top);
+	virtual void setRight( int right);
+    virtual void setHeight( int hh);
+    virtual void setWidth( int width);
+	virtual void setCenter( const Cpoint &center);
+	virtual int height() const;
+	virtual int width() const;
+	virtual int left() const;
+	virtual int right() const;
+	virtual int top() const;
+	virtual int bottom() const;
+	virtual void setVisible( bool visible);
+	virtual void unlockKeycodes();
+	virtual void onPaintLocked(const Cpoint &point);
 
-	keybutton getKey() { return m_code; }
-	void setKey( keybutton code) { m_code=code; }
-	virtual bool onDragStart( Cpoint p) { (void)p.x; return false; } // Position, not grid!
-	virtual bool onDrag( Cpoint p) { (void)p.x; return false; } // Position, not grid!
-	virtual bool onDragEnd( Cpoint p) { (void)p.x; return false; } // Position, not grid!
-	virtual bool onPaintingStart( const Cpoint &p) { (void)p.x; return false; }
-	virtual bool onPaintingMove( const Cpoint &p) { (void)p.x; return false; }
-	virtual bool onPaintingStop( const Cpoint &p) { (void)p.x; return false; }
-	virtual bool wheelUp() { return false; }
-	virtual bool wheelDown() { return false; }
+	virtual keybutton getKey(const Cpoint &p) const;
+	virtual void setKey( keybutton code);
+	virtual bool onDragStart( Cpoint p); // Position, not grid!
+	virtual bool onDrag( Cpoint p); // Position, not grid!
+	virtual bool onDragEnd( Cpoint p); // Position, not grid!
+	virtual bool onPaintingStart( const Cpoint &p);
+	virtual bool onPaintingMove( const Cpoint &p);
+	virtual bool onPaintingStop( const Cpoint &p);
+	virtual bool wheelUp();
+	virtual bool wheelDown();
 	virtual void onUpdate();
+	virtual void setGraphics(Cgraphics *pGraphics);
+	virtual bool isVisible() const;
+	virtual bool hasGraphics() const;
+	virtual bool isPaintingDuringDrag() const;
+	virtual bool isDragEnabled() const;
+	virtual Cdialog *getParent();
+    virtual bool inside( const Cpoint &point) const;
+    virtual Csize size() const;
+    virtual Cpoint origin() const;
+	keybutton getObjectKey() const;
+
 public:
-	Crect		m_rect; ///< Rectangle.
+    Crect       m_rect; ///< Rectangle.
+protected:
 	keybutton 	m_code;		///< Code for keys.
 	bool		m_dragEnable; ///< Can move the button around.
-	bool		m_painting; ///< Is this object for painting?
+	bool		m_paintDuringDrag; ///< Is this object for painting?
 	bool		m_visible; ///< are we there?
-	std::shared_ptr<Cgraphics> m_graphics; ///< where to paint.
-	Cdialog		*m_parent; ///< dialog on top.
+	Cgraphics	*m_pGraphics; ///< where to paint.
+	Cdialog		*m_pParent; ///< dialog on top.
 };
 
-typedef std::vector<CdialogObject*> dialogObjectList;
+typedef std::shared_ptr<CdialogObject> CdialogObjectPtr;
+typedef std::vector<CdialogObjectPtr> dialogObjectList;
 typedef dialogObjectList::iterator 	dialogObjectIterator;
 typedef dialogObjectList::reverse_iterator 	dialogObjectReverseIterator;
 

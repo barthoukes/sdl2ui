@@ -70,7 +70,7 @@ void CdragObject::clean()
  *  @param object [in] What object to move
  *  @return true when done correct
  */
-bool CdragObject::start( const Cpoint &finger, CdialogObject *object)
+bool CdragObject::start( const Cpoint &finger, CdialogObjectPtr object)
 {
 	try
 	{
@@ -78,14 +78,14 @@ bool CdragObject::start( const Cpoint &finger, CdialogObject *object)
 		m_dragObject =object;
 		if ( m_dragObject)
 		{
-			if ( m_dragObject->m_dragEnable ==false)
+			if ( !m_dragObject->isDragEnabled())
 			{
 				clean();
 			}
 			else
 			{
 				// Cdialog::onEvent  drag start
-				m_dragOffset =m_dragStart-m_dragObject->m_rect.origin()*8;
+				m_dragOffset =m_dragStart-m_dragObject->origin()*8;
 			}
 		}
 	}
@@ -109,7 +109,7 @@ Cpoint CdragObject::dragTo( const Cpoint &leftTop)
 		Cpoint p( Cgraphics::m_defaults.width, Cgraphics::m_defaults.height);
 		try
 		{
-			p-=m_dragObject->m_rect.size()*8;
+			p-=m_dragObject->size()*8;
 		}
 		catch (...)
 		{
@@ -134,7 +134,8 @@ bool CdragObject::moveTo( const Cpoint &point)
 		if ( m_dragPoint !=m)
 		{
 			//m_dragPoint =point;
-			dragTo(m);
+			Cdialog::invalidate();
+			dragTo( m);
 			return true;
 		}
 	}
@@ -147,7 +148,7 @@ bool CdragObject::moveTo( const Cpoint &point)
  */
 bool CdragObject::stop( const Cpoint &finger)
 {
-	if ( m_dragObject)
+	if ( m_dragObject.get())
 	{
 		return m_dragObject->onDragEnd( finger);
 	}
@@ -165,13 +166,11 @@ void CdragObject::onPaint()
 {
 	if ( m_dragObject)
 	{
-		m_dragObject->m_graphics->lock_keycodes();
-		m_dragObject->onPaint( m_dragPoint.div8(),0);
-		m_dragObject->m_graphics->unlock_keycodes();
+		m_dragObject->onPaintLocked( m_dragPoint);
 	}
 }
 
-CdragObject & CdragObject::operator =(CdialogObject* object)
+CdragObject & CdragObject::operator =(CdialogObjectPtr object)
 {
 	m_dragObject =object;
 	return *this;
@@ -182,7 +181,7 @@ CdragObject & CdragObject::operator =(CdialogObject* object)
  *  @param offset [in] Where in the small image we start
  *  @param start  [in] What location on screen we start
  */
-void CdragObject::setObject( CdialogObject *object, Cpoint offset, Cpoint start)
+void CdragObject::setObject( CdialogObjectPtr object, Cpoint offset, Cpoint start)
 {
 	m_dragObject =object;
 	m_dragOffset =offset;
@@ -228,7 +227,7 @@ void CdragObject::clear()
  * @param object
  * @param origin
  */
-void CdragObject::dragStart( CdialogObject *object, const Cpoint &origin)
+void CdragObject::dragStart( CdialogObjectPtr object, const Cpoint &origin)
 {
 	int width =object->m_rect.width()*8;
 	int height =object->m_rect.height()*8;
@@ -304,23 +303,6 @@ void CdragObject::onPaint()
 		SDL_RenderCopy( m_renderer, m_texture, NULL, &m_position);
 	}
 }
-
-/*
-void CdragObject::onUpdateBackground()
-{
-	if ( m_background ==NULL)
-	{
-		m_background =SDL_CreateTexture( m_mainGraph->getRenderer(),
-				SDL_PIXELFORMAT_ARGB8888,
-				SDL_TEXTUREACCESS_TARGET, m_position.w, m_position.h);
-		if ( !m_background)
-		{
-			return;
-		}
-	}
-	SDL_RenderCopy( m_renderer, m_background, &m_position, NULL);
-}
-*/
 
 /** Drag an object to another location. */
 Cpoint CdragObject::dragPoint( const Csize &graph, const Cpoint &mouse)

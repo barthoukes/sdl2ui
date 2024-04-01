@@ -18,18 +18,15 @@
  **  Unauthorized duplication and disclosure to third parties is forbidden.
  **===========================================================================*/
 
-#ifndef AUDIO_H_
-#define AUDIO_H_
+#pragma once
 
 #include <string>
+#ifdef USE_SDL
 #include "SDL.h"
 #include "SDL_mixer.h"
-#include "singleton.h"
 
-class Caudio : public Tsingleton<Caudio>
+class Caudio
 {
-friend class Tsingleton<Caudio>;
-
 public:
 	Caudio();
 	virtual ~Caudio();
@@ -47,6 +44,26 @@ public:
 	std::string m_path;
 };
 
-#define ERROR_SOUND()  		Caudio::Instance()->play( AUDIO_ERROR)
+extern Caudio    *m_mainAudio;
 
-#endif /* AUDIO_H_ */
+#define AUDIO_ERROR			"error.wav"
+#define AUDIO_BILL			"bill.wav"
+#define AUDIO_CLICK			"click.wav"
+#define AUDIO_GONG			"gong.wav"
+#define AUDIO_POPUP			"popup.wav"
+#define AUDIO_ERROR			"error.wav"
+#define AUDIO_ERASER		"eraser.wav"
+#define AUDIO_MOVING		"moving.wav"
+#define AUDIO_KEY			"sonar.wav"
+#define AUDIO_DESTROY		"slide_down.wav"
+
+#define ERROR_SOUND()  		if (m_mainAudio) m_mainAudio->play( AUDIO_ERROR)
+#define CREATE_SOUND(x)     if (m_mainAudio) m_mainAudio->play( x)
+#define CLICK_SOUND()       if (m_mainAudio) m_mainAudio->click()
+#else
+#define ERROR_SOUND()
+#define CREATE_SOUND(x)
+#define CLICK_SOUND()
+#endif
+
+/* AUDIO_H_ */

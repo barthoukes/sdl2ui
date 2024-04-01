@@ -1,17 +1,17 @@
 /*============================================================================*/
-/**  @file      sdl_hand_writer.h
- **  @ingroup   user_interface
- **  @brief		Chinese hand-writing library.
+/**  @file       sdl_rect_group.cpp
+ **  @ingroup    sdl2ui
+ **  @brief		 Low level group of rectangles
  **
- **  Create and show images.
+ **  Group of rectangles horizontal for now.
  **
  **  @author     mensfort
  **
  **  @par Classes:
- **              ChandWriter
+ **              CrectGroup
  */
 /*------------------------------------------------------------------------------
- ** Copyright (C) 2011, 2014, 2015
+ ** Copyright (C) 2011, 2014, 2019
  ** Houkes Horeca Applications
  **
  ** This file is part of the SDL2UI Library.  This library is free
@@ -35,39 +35,38 @@
  ** <http://www.gnu.org/licenses/>
  **===========================================================================*/
 
-#pragma once
-
 /*------------- Standard includes --------------------------------------------*/
-#include "sdl_image.h"
-#include "zinnia.h"
+#include "sdl_rect.h"
+#include "sdl_rect_group.hpp"
 
-/// @brief  Create and display buttons.
-class ChandWriter : public Cimage
+CrectGroup::CrectGroup(const Crect &rect, int horizontal_groups, int vertical_groups)
+: m_rect(rect)
+, m_horizontal(horizontal_groups)
+, m_vertical(vertical_groups)
+, m_width(rect.width())
+, m_height(rect.height())
+, m_left(rect.left())
+, m_top(rect.top())
+, m_bottom(rect.bottom())
 {
-public:
-	ChandWriter( Cdialog *parent, const Crect &rect, const std::string &model, int distance);
-	virtual ~ChandWriter();
+}
 
-public:
-	void    clearImage();
-	virtual void onPaint( const Cpoint &p);
-	std::string get( size_t n);
-	void addPoint( int x, int y);
-	virtual bool onPaintingStart( const Cpoint &point);
-	virtual bool onPaintingMove( const Cpoint &point);
-	virtual bool onPaintingStop( const Cpoint &point);
+CrectGroup::~CrectGroup()
+{}
 
-private:
-	int 	m_stroke; ///< Index for our stroke.
-	int 	m_distance; ///< Distance for current stroke.
-	int		m_index;	///< which sub-line inside a stroke.
-	bool 	m_started; ///< Is the mouse pressed.
-	Cpoint  m_lastPoint; ///< Last point.
-	zinnia_recognizer_t *m_recognizer;
-	zinnia_character_t 	*m_character;
-	zinnia_result_t 	*m_result;
-	char 	m_value[4];
-	int		m_minimum_distance; ///< Minimum distance between points
-};
+int CrectGroup::size()
+{
+	return m_horizontal * m_vertical;
+}
 
-typedef std::shared_ptr<ChandWriter> ChandWriterPtr;
+Crect CrectGroup::operator [](int index)
+{
+    int hor = index % m_horizontal;
+    int ver = index / m_horizontal;
+	int left = m_left+hor*m_width/m_horizontal;
+	int right = m_left+(hor+1)*m_width/m_horizontal;
+	int top = m_top+ver*m_height/m_vertical;
+	int bottom = m_top+(ver+1)*m_height/m_vertical;
+	Crect c(left, top, right-left, bottom-top);
+	return c;
+}

@@ -88,7 +88,14 @@ void CprogressBar::onPaint( int touch)
 	//m_speed +=!m_speed;
 	//m_todoTime =((m_maximum-m_minimum)-m_value)/m_speed;
 	char t[32];
-	sprintf(t, "%d", m_todoTime);
+	if ( m_todoTime < 3600)
+	{
+		sprintf(t, "%d", m_todoTime);
+	}
+	else
+	{
+		sprintf(t, ">3600");
+	}
 	Crect r( (m_rect.left()+m_rect.right())/2-4, m_rect.bottom(), 8,4);
 	Cbutton btn( NULL, r, KEY_NOCHANGE, CtextFont(""),
 			     t, BORDER_NONE, GRAVITY_BOTTOM_CENTER, 4, FILL_UNICOLOURED);

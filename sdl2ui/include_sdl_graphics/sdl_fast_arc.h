@@ -1,17 +1,17 @@
 /*============================================================================*/
-/**  @file      sdl_hand_writer.h
+/**  @file      sdl_fast_arc.h
  **  @ingroup   user_interface
- **  @brief		Chinese hand-writing library.
+ **  @brief		hand-clock library.
  **
- **  Create and show images.
+ **  Create timestamp.
  **
  **  @author     mensfort
  **
  **  @par Classes:
- **              ChandWriter
+ **              CfastArc
  */
 /*------------------------------------------------------------------------------
- ** Copyright (C) 2011, 2014, 2015
+ ** Copyright (C) 2011, 2014, 2018
  ** Houkes Horeca Applications
  **
  ** This file is part of the SDL2UI Library.  This library is free
@@ -38,36 +38,30 @@
 #pragma once
 
 /*------------- Standard includes --------------------------------------------*/
-#include "sdl_image.h"
-#include "zinnia.h"
+#include <vector>
+#include "sdl_types.h"
 
-/// @brief  Create and display buttons.
-class ChandWriter : public Cimage
+class Cgraphics;
+
+typedef struct
+{
+	short x,y;
+} Spixel;
+
+#define ARC_FIELDS 30
+class CfastArc
 {
 public:
-	ChandWriter( Cdialog *parent, const Crect &rect, const std::string &model, int distance);
-	virtual ~ChandWriter();
-
-public:
-	void    clearImage();
-	virtual void onPaint( const Cpoint &p);
-	std::string get( size_t n);
-	void addPoint( int x, int y);
-	virtual bool onPaintingStart( const Cpoint &point);
-	virtual bool onPaintingMove( const Cpoint &point);
-	virtual bool onPaintingStop( const Cpoint &point);
+	CfastArc(int width, int height, colour col);
+	~CfastArc();
+	void onPaint( Cgraphics *graphics, int touch, int centerX, int centerY, int angle);
+	void setSize( int w, int h);
 
 private:
-	int 	m_stroke; ///< Index for our stroke.
-	int 	m_distance; ///< Distance for current stroke.
-	int		m_index;	///< which sub-line inside a stroke.
-	bool 	m_started; ///< Is the mouse pressed.
-	Cpoint  m_lastPoint; ///< Last point.
-	zinnia_recognizer_t *m_recognizer;
-	zinnia_character_t 	*m_character;
-	zinnia_result_t 	*m_result;
-	char 	m_value[4];
-	int		m_minimum_distance; ///< Minimum distance between points
+	int pieColour( int dx, int dy);
+private:
+	colour colours[3]; // First colour, second colour and ball
+	std::vector<Spixel> pixels[ARC_FIELDS];
+	int width;
+	int height;
 };
-
-typedef std::shared_ptr<ChandWriter> ChandWriterPtr;

@@ -39,7 +39,9 @@
 
 /*------------- Standard includes --------------------------------------------*/
 #include <string>
-#include "sdl_graphics.h"
+#include <memory>
+
+#include "sdl_types.h"
 #include "sdl_dialog_object.h"
 
 /// @brief  Forward declaration.
@@ -59,12 +61,12 @@ typedef enum
 class Cslider : public CdialogObject
 {
 public:
-	Cslider( const Crect &rect, int unitSize, keybutton button, EsliderType type=SLIDER_VERTICAL_UPDOWN);
+	Cslider( const Crect &rect, double unitSize, keybutton button, EsliderType type=SLIDER_VERTICAL_UPDOWN);
 	virtual ~Cslider();
 
 public:
 	void	onPaint( int touch);
-	virtual void onPaint( const Cpoint &p, int touch) { (void)p; onPaint(touch); }
+	virtual void onPaint( const Cpoint &p, int touch);
 	void 	setImage( const std::string &image);
 	void	setColours( colour scrollbar, colour background);
 	void	paintVertical();
@@ -72,12 +74,9 @@ public:
 	void    paintHorizontalBar();
 	bool    setRange( double minimum, double maximum);
 
-	virtual void setValue( double y)
-	{
-		m_value =gLimit( y, m_minimum, m_maximum-m_itemsOnScreen);
-	}
-	double getValue() { return m_value; }
-	int getInt() { return (int)(m_value+0.5); }
+	virtual void setValue( double y);
+	double getValue();
+	int getInt();
 	virtual bool onDragStart( Cpoint p);
 	virtual bool onDrag( Cpoint p);
 	virtual bool onDragEnd( Cpoint p);
@@ -100,7 +99,7 @@ private:
 	bool				m_imageEnable; ///< Image enabled.
 	int					m_image_x; ///< Position slider.
 	int					m_image_y; ///< Position slider.
-	int 				m_unitSize;
+	double 				m_unitSize;
 
 protected:
 	double  			m_value; ///< Current y-value.
@@ -114,3 +113,4 @@ private:
 	int					m_itemsOnScreen; ///< Items fitting on screen.
 };
 
+typedef std::shared_ptr<Cslider> CsliderPtr;

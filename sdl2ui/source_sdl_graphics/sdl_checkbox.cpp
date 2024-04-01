@@ -41,13 +41,12 @@
 /*============================================================================*/
 ///
 /// @brief Constructor to be expired...
-//
+///
 /// @param x [in] Position.
 /// @param y [in] Position.
 /// @param width [in] Position.
 /// @param height [in] Position.
 ///
-/*============================================================================*/
 Ccheckbox::Ccheckbox( Cdialog *parent,
 		          const Crect &rect,
 		          keybutton code,
@@ -63,13 +62,12 @@ Ccheckbox::Ccheckbox( Cdialog *parent,
 /*============================================================================*/
 ///
 /// @brief Constructor to be expired...
-//
+///
 /// @param x [in] Position.
 /// @param y [in] Position.
 /// @param width [in] Position.
 /// @param height [in] Position.
 ///
-/*============================================================================*/
 Ccheckbox::Ccheckbox( Cdialog *parent,
 		          const Crect &rect,
 		          keybutton code,
@@ -91,7 +89,6 @@ Ccheckbox::Ccheckbox( Cdialog *parent,
 /// @param width [in] Position.
 /// @param height [in] Position.
 ///
-/*============================================================================*/
 Ccheckbox::Ccheckbox( Cdialog *parent,
 		          const Crect &rect,
 		          keybutton code,
@@ -124,7 +121,6 @@ Ccheckbox::Ccheckbox( Cdialog *parent,
 ///
 /// @brief Destructor.
 ///
-/*============================================================================*/
 Ccheckbox::~Ccheckbox()
 {
 	m_checked=false;
@@ -138,7 +134,6 @@ Ccheckbox::~Ccheckbox()
 ///
 ///  @post		Dialog updated. Buttons, drag and background are done automatic.
 ///
-/*============================================================================*/
 void Ccheckbox::onPaint( int touch)
 {
 	if ( !m_visible)
@@ -148,6 +143,72 @@ void Ccheckbox::onPaint( int touch)
 	Cbutton::onPaint( touch);
 	std::string i=m_checked ? "check*.png":"uncheck*.png";
 	int w=Cgraphics::m_defaults.button_height;
-	Cimage state( m_parent, m_rect.offset( m_rect.width()-w, 0, w,w), KEY_NOCHANGE, i);
+	Cimage state( m_pParent, m_rect.offset( m_rect.width()-w, 0, w,w), KEY_NOCHANGE, i);
+	state.onPaint(touch);
+}
+
+/*============================================================================*/
+///
+/// @brief Constructor
+///
+/// @param x [in] Position.
+/// @param y [in] Position.
+/// @param width [in] Position.
+/// @param height [in] Position.
+///
+CbottomCheckbox::CbottomCheckbox( Cdialog *parent,
+		          const Crect &rect,
+		          keybutton code,
+		          textId id)
+: CbottomButton( parent, rect, code, id)
+, m_checked(false)
+{
+}
+
+/*============================================================================*/
+///
+/// @brief Constructor
+///
+/// @param x [in] Position.
+/// @param y [in] Position.
+/// @param width [in] Position.
+/// @param height [in] Position.
+///
+CbottomCheckbox::CbottomCheckbox( Cdialog *parent,
+		          const Crect &rect,
+		          keybutton code,
+		          const std::string &value)
+: CbottomButton( parent, rect, code, value)
+, m_checked(false)
+{
+}
+
+/*============================================================================*/
+///
+/// @brief Destructor.
+///
+CbottomCheckbox::~CbottomCheckbox()
+{
+	m_checked=false;
+}
+
+/*============================================================================*/
+///
+///  @brief 	Paint the dialog once. Use invalidate() to re-paint soon.
+///
+///	 @pre		Called when dialog is invalidated.
+///
+///  @post		Dialog updated. Buttons, drag and background are done automatic.
+///
+void CbottomCheckbox::onPaint( int touch)
+{
+	if ( !m_visible)
+	{
+		return;
+	}
+	CbottomButton::onPaint( touch);
+	std::string i=m_checked ? "check*.png":"uncheck*.png";
+	int w=Cgraphics::m_defaults.button_height;
+	Cimage state( m_pParent, m_rect.offset( m_rect.width()-w, 0, w,w), KEY_NOCHANGE, i);
 	state.onPaint(touch);
 }

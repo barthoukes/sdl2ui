@@ -35,7 +35,7 @@ const Skey keys[]=
 	{	KEY_DOWN			, "DOWN" },
 	{	KEY_PAGEUP			, "PAGEUP" },
 	{	KEY_PAGEDOWN		, "PAGEDOWN" },
-	{	KEY_EQUALS			, "EQUALS" },
+	{	KEY_EQUALS			, "=" },
 	{	KEY_F1				, "F1" },
 	{	KEY_F2				, "F2" },
 	{	KEY_F3				, "F3" },
@@ -49,14 +49,13 @@ const Skey keys[]=
 	{	KEY_F11				, "F11" },
 	{	KEY_F12				, "F12" },
 	{	KEY_QUESTION		, "?" },
-	{	KEY_AMPERSAND		, "AMPERSAND" },
+	{	KEY_AMPERSAND		, "&" },
 	{	KEY_HASH			, "HASH" },
-	{	KEY_APOSTROPH		, "APOSTROPH" },
-	{	KEY_BIGGER			, "BIGGER" },
-	{	KEY_SMALLER			, "SMALLER" },
-	{	KEY_BRACKET_OPEN	, "BRACKET_OPEN" },
-	{	KEY_BRACKET_CLOSE	, "BRACKET_CLOSE" },
-	{	KEY_EXCLAMATION		, "EXCLAMATION" },
+	{	KEY_BIGGER			, ">" },
+	{	KEY_SMALLER			, "<" },
+	{	KEY_BRACKET_OPEN	, "[" },
+	{	KEY_BRACKET_CLOSE	, "]" },
+	{	KEY_EXCLAMATION		, "!" },
 	{	KEY_0				, "0" },
 	{	KEY_1				, "1" },
 	{	KEY_2				, "2" },
@@ -220,7 +219,7 @@ const Skey keys[]=
 	{	KEY_PAGEORDER	, "PAGEORDER" },
 	{	KEY_FB			, "FB" },
     { 	KEY_MERGE 		, "+" },
-	{	KEY_DOLLAR		, "DOLLAR" },
+	{	KEY_DOLLAR		, "$" },
 	{	KEY_PERCENT		, "PERCENT" },
 	{	KEY_LOAD		, "LOAD" },
 	{	KEY_SAVE		, "SAVE" },
@@ -308,6 +307,7 @@ const Skey keys[]=
     {   KEY_UNDEFINED   , "" }
 };
 
+/*----------------------------------------------------------------------------*/
 std::string key2string( keybutton key)
 {
 	for ( int p=0;;p++)
@@ -349,6 +349,7 @@ std::string key2string( keybutton key)
 	return "";
 }
 
+/*----------------------------------------------------------------------------*/
 keybutton string2key( std::string s)
 {
 	for ( int p=0;;p++)
@@ -386,21 +387,31 @@ keybutton string2key( std::string s)
 	return KEY_UNDEFINED;
 }
 
+/*----------------------------------------------------------------------------*/
 Ckeybutton::operator std::string()
 {
 	return key2string( m_key);
 }
 
+/*----------------------------------------------------------------------------*/
 Ckeybutton::operator keybutton()
 {
 	return m_key;
 }
 
+/*----------------------------------------------------------------------------*/
 Ckeybutton::Ckeybutton( const std::string &str)
 : m_key( string2key(str))
 {
 }
 
+/*----------------------------------------------------------------------------*/
+Ckeybutton::Ckeybutton( keybutton n)
+{
+	m_key =n;
+}
+
+/*----------------------------------------------------------------------------*/
 std::string Ckeybutton::label()
 {
 	if ( m_key>=KEY_RADICAL1 && m_key<=KEY_RADICAL189)

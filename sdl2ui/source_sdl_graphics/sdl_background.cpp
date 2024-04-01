@@ -40,6 +40,7 @@
 #include "sdl_background.h"
 #include "sdl_dialog_object.h"
 
+/*----------------------------------------------------------------------------*/
 Cbackground::Cbackground( Cdialog *parent, const Crect &rect,
 		          keybutton code, colour col1, int radius, EfillType fill, colour col2)
 : CdialogObject( parent, rect, code)
@@ -61,6 +62,7 @@ Cbackground::Cbackground( Cdialog *parent, const Crect &rect,
 	setColours( col1, col2);
 }
 
+/*----------------------------------------------------------------------------*/
 // n=0..height
 colour Cbackground::calcColour( colour col1, colour col2, double fraction)
 {
@@ -93,6 +95,7 @@ colour Cbackground::calcColour( colour col1, colour col2, double fraction)
 	return (r<<16) + (g<<8) + b;
 }
 
+/*----------------------------------------------------------------------------*/
 bool Cbackground::pieColour( int dx, int dy)
 {
 	int corner =(int)(atan2( dx,-dy)*360.0/6.2928);
@@ -101,6 +104,7 @@ bool Cbackground::pieColour( int dx, int dy)
 	return ( corner >= m_pieCorner );
 }
 
+/*----------------------------------------------------------------------------*/
 /** @brief Draw the background with a touch alue
  *  @param touch 0 = not pressed, 100 = pressed, 99..1 = releasing
  */
@@ -118,15 +122,15 @@ void Cbackground::onPaint( int touch)
 	int y=0;
 	double maxf;
 
-	colour col1 =touch ? m_graphics.get()->brighter(m_col1, -touch/4):m_col1;
-	colour col2 =touch ? m_graphics.get()->brighter(m_col2, -touch/4):m_col2;
+	colour col1 =touch ? m_pGraphics->brighter(m_col1, -touch/4):m_col1;
+	colour col2 =touch ? m_pGraphics->brighter(m_col2, -touch/4):m_col2;
 	switch (m_pattern)
 	{
 	case FILL_NONE:
 		return;
 	case FILL_UNICOLOURED:
-		m_graphics->setColour( col1);
-		m_graphics->bar(xx, yy, mx+1, my+1, m_radius);
+		m_pGraphics->setColour( col1);
+		m_pGraphics->bar(xx, yy, mx+1, my+1, m_radius);
 		return;
 	case FILL_IMAGE:
 		onPaintImageButton();
@@ -144,19 +148,19 @@ void Cbackground::onPaint( int touch)
 		{
 			int v=(int)( sqrt( (double)(m_radius*m_radius-(m_radius-y)*(m_radius-y))+0.5) );
 			v =m_radius-v;
-			m_graphics->setColour( calcColour( col1, col2, y/height));
-			m_graphics->line( xx+v,yy+y, mx-v, yy+y);
-			m_graphics->setColour( calcColour( col1, col2, (height-1.0-y)/height));
-			m_graphics->line( xx+v,my-y, mx-v, my-y);
+			m_pGraphics->setColour( calcColour( col1, col2, y/height));
+			m_pGraphics->line( xx+v,yy+y, mx-v, yy+y);
+			m_pGraphics->setColour( calcColour( col1, col2, (height-1.0-y)/height));
+			m_pGraphics->line( xx+v,my-y, mx-v, my-y);
 		}
 		for ( y=m_radius+yy; y<my-m_radius; y++)
 		{
-			m_graphics->setColour( calcColour( col1,col2, (y-yy)/height));
-			m_graphics->line( xx,y, mx,y);
+			m_pGraphics->setColour( calcColour( col1,col2, (y-yy)/height));
+			m_pGraphics->line( xx,y, mx,y);
 		}
 		if ( m_key!=KEY_UNDEFINED)
 		{
-			m_graphics->setCode( Crect( 0, 0, m_graphics->width(),m_graphics->height()), m_key);
+			m_pGraphics->setKey( Crect( 0, 0, m_mainGraph->width(),m_mainGraph->height()), m_key);
 		}
 		break;
 	case FILL_CIRCULAR:
@@ -165,7 +169,7 @@ void Cbackground::onPaint( int touch)
 			maxf =width/2.2;
 			double dist;
 			double len;
-			m_graphics->setColour( col1);
+			m_pGraphics->setColour( col1);
 			m_B1 =(col1 & 0x0000FF);
 			m_G1 =(col1 & 0x00FF00) >> 8;
 			m_R1 =(col1 & 0xFF0000) >> 16;
@@ -180,12 +184,9 @@ void Cbackground::onPaint( int touch)
 				{
 					len =(x-middle_x)*(x-middle_x)+(middle_y-(yy+y))*(middle_y-(yy+y));
 					dist =sqrt( len)/maxf;
-#ifdef USE_SDL2
-#else
-					//m_graphics->setColour( calcColour( col1, col2, dist));
-					m_graphics->transparantPixel( x, yy+y, dist);
-					m_graphics->transparantPixel( x, my-y, dist);
-#endif
+					m_pGraphics->transparantPixel( x, yy+y, dist);
+					m_pGraphics->transparantPixel( x, my-y, dist);
+
 				}
 			}
 			for ( y=m_radius+yy; y<my-m_radius; y++)
@@ -193,21 +194,18 @@ void Cbackground::onPaint( int touch)
 			{
 				len =(x-middle_x)*(x-middle_x)+(y-middle_y)*(y-middle_y);
 				dist =sqrt( len)/maxf;
-				m_graphics->transparantPixel( x, y, dist);
-
-				//m_graphics->setColour( calcColour( col1,col2, dist));
-				//m_graphics->setPixel( x,y);
+				m_pGraphics->transparantPixel( x, y, dist);
 			}
 			if ( m_key!=KEY_UNDEFINED)
 			{
-				m_graphics->setCode( Crect( 0, 0, m_graphics->width(),m_graphics->height()), m_key);
+				m_pGraphics->setKey( Crect( 0, 0, m_mainGraph->width(),m_mainGraph->height()), m_key);
 			}
 			break;
 		}
 	case FILL_PIE:
 		{
 			maxf =width/2.2;
-			m_graphics->setColour( col1);
+			m_pGraphics->setColour( col1);
 			m_B1 =(col1 & 0x0000FF);
 			m_G1 =(col1 & 0x00FF00) >> 8;
 			m_R1 =(col1 & 0xFF0000) >> 16;
@@ -222,23 +220,23 @@ void Cbackground::onPaint( int touch)
 				{
 					// Define corner
 					colour col =pieColour( (int)(x-middle_x), (int)((yy+y)-middle_y) ) ? col1:col2;
-					m_graphics->setColour( col );
-					m_graphics->setPixel( x, yy+y );
+					m_pGraphics->setColour( col );
+					m_pGraphics->setPixel( x, yy+y );
 					col =pieColour( (int)(x-middle_x), (int)((my-y)-middle_y) ) ? col1:col2;
-					m_graphics->setColour( col );
-					m_graphics->setPixel( x, my-y );
+					m_pGraphics->setColour( col );
+					m_pGraphics->setPixel( x, my-y );
 				}
 			}
 			for ( y=m_radius+yy; y<my-m_radius; y++)
 			for ( x=xx; x<=mx; x++)
 			{
 				colour col =pieColour( (int)(x-middle_x), (int)(y-middle_y) ) ? col1:col2;
-				m_graphics->setColour( col );
-				m_graphics->setPixel( x, y );
+				m_pGraphics->setColour( col );
+				m_pGraphics->setPixel( x, y );
 			}
 			if ( m_key!=KEY_UNDEFINED)
 			{
-				m_graphics->setCode( Crect( 0, 0, m_graphics->width(),m_graphics->height()), m_key);
+				m_pGraphics->setKey( Crect( 0, 0, m_mainGraph->width(),m_mainGraph->height()), m_key);
 			}
 			break;
 		}
@@ -246,14 +244,21 @@ void Cbackground::onPaint( int touch)
 	}
 }
 
+/*----------------------------------------------------------------------------*/
 /** @brief Set colours for the background.
  *  @param col1 [in] First colour
  *  @param col2 [in] Second colour
  */
 void Cbackground::setColours( colour col1, colour col2)
 {
-	m_col1=col1;
-	m_col2=col2;
+    if (col1 != -1)
+    {
+        m_col1 = col1;
+    }
+    if (col2 != -1)
+    {
+        m_col2=col2;
+    }
 	if ( col2<0 && col2>=-1000)
 	{
 		double f =-col2*0.01;
@@ -267,6 +272,7 @@ void Cbackground::setColours( colour col1, colour col2)
 	}
 }
 
+/*----------------------------------------------------------------------------*/
 void Cbackground::onPaintImageButton()
 {
 	int xx =(m_rect.left() << 3)+m_borderWidth;
@@ -280,20 +286,26 @@ void Cbackground::onPaintImageButton()
 		{
 			int v=(int)( sqrt( (double)(m_radius*m_radius-(m_radius-x)*(m_radius-x))+0.5) );
 			v =m_radius-v;
-			m_graphics->imageLine( m_image, xx+v,yy+x, mx-v, yy+x+1);
-			m_graphics->imageLine( m_image, xx+v,my-1-x, mx-v, my-x);
+			m_pGraphics->imageLine( m_image, xx+v,yy+x, mx-v, yy+x+1);
+			m_pGraphics->imageLine( m_image, xx+v,my-1-x, mx-v, my-x);
 		}
 	}
-	m_graphics->imageLine( m_image, xx, m_radius+yy, mx,my-m_radius);
+	m_pGraphics->imageLine( m_image, xx, m_radius+yy, mx,my-m_radius);
 	if ( m_key!=KEY_UNDEFINED)
 	{
-		int w =m_graphics->width();
-		int h =m_graphics->height();
-		m_graphics->setCode( Crect(0, 0, w,h), m_key);
+		int w =m_mainGraph->width();
+		int h =m_mainGraph->height();
+		m_pGraphics->setKey( Crect(0, 0, w,h), m_key);
 	}
 }
 
+/*----------------------------------------------------------------------------*/
 Cbackground::~Cbackground()
 {
-	// TODO Auto-generated destructor stub
+}
+
+/*----------------------------------------------------------------------------*/
+Crect Cbackground::getRect() const
+{
+    return m_rect;
 }

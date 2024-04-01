@@ -38,40 +38,11 @@
 #pragma once
 /*------------- Standard includes --------------------------------------------*/
 #include <queue>
-#ifdef USE_SDL2
-#include "SDL_render.h"
-#include "SDL_video.h"
-#else
-#endif
+#include <memory>
+#include "sdl_types.h"
 #include "sdl_dialog.h"
-
-/// @brief Structure to hold each texture to paint. We have a queue of this.
-class CswypeObject
-{
-public:
-	CswypeObject( sdlTexture *texture, int index, const Crect &destination)
-	: item(NULL), texture(texture), index(index), itemId(0), destination(destination){}
-	virtual ~CswypeObject()
-	{
-		clean();
-	}
-	void clean()
-	{
-#ifdef USE_SDL2
-#else
-		if (texture) SDL_FreeSurface(texture);
-		texture =NULL;
-#endif
-	}
-	void onPaint( Cpoint &point);
-
-public:
-	CdialogObject 		*item; ///< Reference to object (if needed)
-	sdlTexture	 		*texture; ///< Painted area
-	int			  		index; ///< Index in the list
-	int					itemId; ///< Item to use.
-	Crect				destination; ///< Where to paint the object should be multiplied by 8.
-};
+#include "my_thread.hpp"
+#include "sdl_swype_object.h"
 
 /// @brief Element in the list to scroll.
 class IscrollElement
@@ -80,6 +51,9 @@ class IscrollElement
 	virtual void onPaint() =0;
 	virtual ~IscrollElement() {}
 };
+
+class CdialogObject;
+typedef std::shared_ptr<CdialogObject> CdialogObjectPtr;
 
 #define MEASUREMENTS  	10
 
@@ -102,20 +76,6 @@ private:
 	int			m_previousTime;
 };
 
-/// @brief Decide what to paint.
-typedef enum
-{
-	PAINT_BOTTOM,			///< Bottom not finished.
-	PAINT_TOP,				///< Top not painted.
-	PAINT_BOTTOM_OPTIONAL, 	///< Can paint more on bottom for future scroll.
-	PAINT_TOP_OPTIONAL,		///< can paint more on top for future scroll.
-	PAINT_RIGHT,			///< Bottom not finished.
-	PAINT_LEFT,				///< Top not painted.
-	PAINT_RIGHT_OPTIONAL, 	///< Can paint more on bottom for future scroll.
-	PAINT_LEFT_OPTIONAL,	///< can paint more on top for future scroll.
-	PAINT_READY,			///< All possible items painted.
-} Epainted;
-
 /// @brief Scrolling dialog with list of items.
 class CswypeDialog : public Cdialog
 {
@@ -126,17 +86,14 @@ public:
 #ifdef USE_SDL2
 	SDL_Renderer	*m_itemRenderer;    ///< Renderer for items.
 #endif        
+protected:
 	Crect m_itemRect; ///< Size for an item in the list
 	int	m_listSize; ///< Size for the list
 
     // Crect m_rect has where it is inserted on screen.
-    bool m_horizontal; ///< Is it horizontal scrolling?
 	int m_sizes; ///< Number of elements in the list.
-    double m_scroll; ///< Amount of scroll.
+    double m_scrollPosition; ///< Amount of scroll.
     double m_speed; ///< Speed scroll;
-    std::vector<CswypeObject*> m_swypeObjects;
-    int m_validBuffers; ///< Increasing amount of object buffers
-    int m_visibleBuffers; ///< Number of visible object buffers
     int m_firstUnitPainted; ///< First row painted inside the (paintedArea/textures).
     int m_lastUnitPainted; ///< last row painted in the (paintedArea/textures).
     int m_firstVisibleUnit; ///< First item/row on display
@@ -150,6 +107,7 @@ public:
     Cspeeding m_speeding; ///< Calculate speed of scrollbar.
 
 protected:
+    bool        m_horizontal; ///< Is it horizontal scrolling?
     int 		m_itemBlocks; ///< Height/Width of 1 item divided by 8 pixels.
 	Ctimeout 	m_timer; ///< Time to run.
 	int			m_startPosition; ///< Place where we come from.
@@ -159,74 +117,88 @@ protected:
 	bool		m_repaint; ///< Paint again.
 	bool		m_dragEnable; ///< Can move the button around.
 	int			m_dragIndex; ///< Index of object to drag.
-	CdialogObject *m_object; ///< Need a pointer to any object.
+	CdialogObjectPtr m_object; ///< Need a pointer to any object.
+
 public:
 	int			m_cursor; ///< Selected customer.
 
-public:
-    virtual size_t rows();
     virtual void clean();
+    virtual bool onLoop();
+    virtual void resetPaintedArea();
+    virtual bool scrollRelative( double distance, bool flow);
+    virtual void setCursor( int index);
+    virtual void setFirstKey( keybutton key);
+    virtual void setRect( const Crect &rect);
+    virtual void topStop();
+
+    virtual void enableDrag( bool drag);
+    virtual keybutton findButton( const Cpoint &p);
+    virtual CdialogObjectPtr findObject( const Cpoint &p);
+    virtual int getDragIndex();
+    virtual int getScrollIndex( keybutton sym);
+    virtual int getScrollOffset();
+    virtual void invalidate( int row);
+    virtual void invalidate();
+    virtual bool isRowVisible( int row);
+    virtual bool isScrollDragDialog( const Cpoint &pb);
+    virtual bool isHorizontalScrollDialog( const Cpoint &p);
     virtual int itemBlocks();
-    virtual bool scrollToRow( int offset ,int time);
+    virtual void makeSureRowVisible( int row, int time =2000);
+    virtual void onCleanup();
+    virtual void onPaintBackground( int row, const Crect &location);
+    virtual void onPaint();
+    virtual void repaint();
+    virtual size_t rows();
     virtual bool scrollToPixel( int offset ,int time);
+
+protected:
+    virtual void popFirst();
+    virtual bool scrollToRow( int offset ,int time);
     virtual bool scrollIndex( double row, int time);
-	virtual keybutton findButton( const Cpoint &p);
 	virtual void setItemBlocks( int rowHeight);
-
 	virtual void onUpdate() {}
-	virtual void onPaint();
-	virtual void onCleanup();
 	virtual void onPaintUnit( int unit, const Crect &location) =0;
-	virtual void onPaintBackground( int row, const Crect &location);
-	virtual void invalidate();
-	virtual int getScrollIndex( keybutton sym);
-	virtual bool scrollRelative( double distance, bool flow);
-	virtual CdialogObject *findObject( const Cpoint &p);
-	virtual void setRect( const Crect &rect);
-	virtual bool isRowVisible( int row);
-
-	Estatus onButton( keymode mod, keybutton sym);
-	virtual bool onLoop();
-	virtual void topStop();
+	Estatus onButton( SDLMod mod, keybutton sym);
 	virtual void wheelDown( int mx, int my);
 	virtual void wheelUp( int mx, int my);
-	virtual int getScrollOffset() { return (int)m_scroll; }
-	virtual double getScrollIndex() { return m_scroll/(double)(itemBlocks()*8); }
+	virtual double getScrollIndex();
     virtual int scrollMax();
-	virtual void resetPaintedArea();
-	void makeSureRowVisible( int row, int time =2000);
-	virtual void invalidate( int row);
-	virtual void setCursor( int index);
-	void enableDrag( bool drag) { m_dragEnable=drag; }
-	virtual bool isScrollDragDialog( const Cpoint &p) { (void)p; return m_dragEnable; }
-	virtual bool isHorizontalScrollDialog( const Cpoint &p) { (void)p; return m_horizontal; }
-	int getDragIndex() { return m_dragIndex; }
-    void repaint() { m_repaint=true; CswypeDialog::onPaint(); }
 	virtual void calculateItemRect();
-	void setMargin( double margin) { m_endMargin =(int)( margin*8.0f*itemBlocks()); }
-	CswypeObject *insertAtBegin();
-    CswypeObject *insertAtEnd();
+	void setMargin( double margin);
+	CswypeObjectPtr insertAtBegin(const Crect &rect);
+    CswypeObjectPtr insertAtEnd(const Crect &rect);
+	bool hasReachedEndPosition();
+	void setDirection(bool horizontal);
 	
 protected:
 	void clearSpeed();
 	virtual void onPaintSurfaceHorizontal( bool optional);
 	virtual void onPaintSurfaceVertical( bool optional);
-	virtual void renderCopy( sdlTexture *surface, SDL_Rect *rect);
-	sdlTexture *createSurface();
-	sdlTexture *createSurface( int w, int h);
+	virtual void renderCopy( SDL_Surface *surface, SDL_Rect *rect);
 
 private:
 	virtual Epainted visiblePainted();
 	Epainted paintSingleAreaVertical();
 	virtual void paintSurfaceTop();
-	virtual bool paintSurfaceRight();
-	virtual bool paintSurfaceLeft();
+	virtual void paintSurfaceRight();
+	virtual void paintSurfaceLeft();
 	virtual void paintSurfaceBottom();
 	virtual int surfaceMax();
 	virtual void calculateSurfacePosition();
 	virtual bool isSwypeDialog( const Cpoint &p) { (void)p; return true; }
+	void onPaintHorizontal( SDL_Rect &rct);
+    void onPaintVertical( SDL_Rect &rct);
+
+
+protected:
+    std::vector<CswypeObjectPtr> m_swypeObjects;
+    std::vector<CswypeObjectPtr> m_spares;
+
+private:
+    int  m_lowPrioCount;
 };
 
+typedef std::shared_ptr<CswypeDialog> CswypeDialogPtr;
 
 /** Scroll object, not really usefull for other things than drag &drop.
  */
@@ -243,7 +215,7 @@ public:
 	virtual void onPaint( const Cpoint &p, int touch)
 	{
 		(void)touch;
-		CswypeDialog *dlg=dynamic_cast<CswypeDialog*>( m_parent);
+		CswypeDialog *dlg=dynamic_cast<CswypeDialog*>( m_pParent);
 		if ( dlg)
 		{
 			Crect r( p.left(), p.top(), dlg->width(), dlg->itemBlocks());

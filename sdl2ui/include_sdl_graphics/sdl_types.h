@@ -32,9 +32,58 @@
 #pragma once
 
 /*------------- Standard includes --------------------------------------------*/
-#include "sdl_keybutton.h"
 
-#if 0
+/// All colours.
+typedef int colour;
+
+typedef enum
+{
+	RESIZE_OFF = 0,
+	RESIZE_ON = 1, ///< Resize font yes.
+	RESIZE_DEFAULT,
+} Eresize;
+
+/// @brief Decide what to paint.
+typedef enum
+{
+	PAINT_BOTTOM,			///< Bottom not finished.
+	PAINT_TOP,				///< Top not painted.
+	PAINT_BOTTOM_OPTIONAL, 	///< Can paint more on bottom for future scroll.
+	PAINT_TOP_OPTIONAL,		///< can paint more on top for future scroll.
+	PAINT_RIGHT,			///< Bottom not finished.
+	PAINT_LEFT,				///< Top not painted.
+	PAINT_RIGHT_OPTIONAL, 	///< Can paint more on bottom for future scroll.
+	PAINT_LEFT_OPTIONAL,	///< can paint more on top for future scroll.
+	PAINT_READY,			///< All possible items painted.
+} Epainted;
+
+/// @brief  Border type for buttons.
+typedef enum
+{
+	BORDER_NONE,
+	BORDER_THIN,
+	BORDER_THIN_SHADOW,
+	BORDER_THIN_SELECTED,
+	BORDER_THICK,
+	BORDER_THICK_SHADOW,
+	BORDER_ITEM_THICK,
+	BORDER_THICK_SELECTED,
+	BORDER_THIN_BUTTON_SHADOW,
+} EborderType;
+
+/// @brief  Fill pattern.
+typedef enum
+{
+	FILL_NONE, ///< No fill.
+	FILL_UNICOLOURED,	///< No fill.
+	FILL_2COLOURS, ///< Complete fill.
+	FILL_GRADIENT, ///< Fill colour 1 to 2.
+	FILL_PYRAMID, ///< First colour in middle.
+	FILL_IMAGE, ///< Fill with image.
+	FILL_CIRCULAR, ///< Fill with circular background
+	FILL_PIE ///< Fill pie with 2 parts
+} EfillType;
+
 /// Colours by default.
 enum Ecolours
 {
@@ -96,22 +145,11 @@ enum EcolourMode
 	MAX_COLOUR_MODE,
 };
 
+/// All languages.
+typedef int language;
 
-#define SOLID_FILL 		1
-#define INTERLEAVE_FILL 2
-#endif
-
-/// All colours.
-typedef int colour;
-
-
-/// @brief Status for message when sent to any client.
-typedef enum
-{
-	DIALOG_EVENT_PROCESSED,		///< Event processed, stop sending.
-	DIALOG_EVENT_OPEN,			///< Event still open.
-	DIALOG_EVENT_GENERAL,		///< Dialog can be sent to all.
-	DIALOG_EVENT_EXIT			///< Dialog request to stop the dialog.
-} Estatus;
+/// All identified text strings
+typedef int textId;
+#define INVALID_TEXT_ID -1
 
 /* SDL_TYPES_H_ */

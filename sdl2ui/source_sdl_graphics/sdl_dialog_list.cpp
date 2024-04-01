@@ -38,113 +38,406 @@
 /*------------- Standard includes --------------------------------------------*/
 #include "sdl_dialog_list.h"
 #include "sdl_dialog_event.h"
-#include "sdl_dialog.h"
+#include "sdl_swype_dialog.h"
 
 static const bool D=false;
 
+/*----------------------------------------------------------------------------*/
+/// Our system, our world.
+//CdialogList g_myWorld;
+
+/*----------------------------------------------------------------------------*/
+
+/*----------------------------------------------------------------------------*/
 /** @brief Constructor */
 CdialogList::CdialogList()
 {
 	clear();
 }
 
+/*----------------------------------------------------------------------------*/
 /** @brief Destructor. */
 CdialogList::~CdialogList()
 {
 	clear();
 }
 
+/*----------------------------------------------------------------------------*/
+void CdialogList::deleteDialogs()
+{
+    lock();
+    for ( CdialogBase *dialog : m_dialogs1)
+    {
+        if (dialog) delete dialog;
+    }
+    unlock();
+
+    clear();
+}
+
+/*----------------------------------------------------------------------------*/
+void CdialogList::resetPaintedArea()
+{
+    lock();
+    for ( CdialogBase *base : m_dialogs1)
+    {
+        CswypeDialog *dialog = dynamic_cast<CswypeDialog*>(base);
+        if ( dialog !=NULL)
+        {
+            dialog->resetPaintedArea();
+        }
+    }
+    for ( CdialogBasePtr base2 : m_dialogs2)
+    {
+        CswypeDialog *swypeDialog =dynamic_cast<CswypeDialog*>(base2.get());
+        if ( swypeDialog)
+        {
+            swypeDialog->resetPaintedArea();
+        }
+    }
+    unlock();
+}
+
+/*----------------------------------------------------------------------------*/
+bool CdialogList::onInit()
+{
+    lock();
+    bool running = true;
+    for ( CdialogBase *base : m_dialogs1)
+    {
+        Cdialog *dialog = dynamic_cast<Cdialog*>(base);
+        if ( dialog && dialog->onInit() ==false)
+        {
+            running = false;
+            break;
+        }
+    }
+    for ( CdialogBasePtr base2 : m_dialogs2)
+    {
+        Cdialog *dialog =dynamic_cast<CswypeDialog*>(base2.get());
+        if ( dialog && dialog->onInit() ==false)
+        {
+            running = false;
+            break;
+        }
+    }
+    unlock();
+    return running;
+}
+
+/*----------------------------------------------------------------------------*/
+bool CdialogList::onLoop()
+{
+    lock();
+    bool running = true;
+    for ( CdialogBase *base : m_dialogs1)
+    {
+        Cdialog *dialog = dynamic_cast<Cdialog*>(base);
+        if (!dialog || !dialog->isVisible())
+        {
+        	continue;
+        }
+        if ( dialog->onLoop() ==false)
+        {
+            running = false;
+            break;
+        }
+    }
+    for ( CdialogBasePtr base2 : m_dialogs2)
+    {
+        Cdialog *dialog =dynamic_cast<CswypeDialog*>(base2.get());
+        if (!dialog || !dialog->isVisible())
+        {
+        	continue;
+        }
+        if (dialog->onLoop() ==false)
+        {
+            running = false;
+            break;
+        }
+    }
+    unlock();
+    return running;
+}
+
+/*----------------------------------------------------------------------------*/
+void CdialogList::onCleanup()
+{
+    lock();
+    for ( CdialogBase *base : m_dialogs1)
+    {
+        Cdialog *dialog = dynamic_cast<Cdialog*>(base);
+        if ( dialog)
+        {
+            dialog->onCleanup();
+        }
+    }
+    for ( CdialogBasePtr base2 : m_dialogs2)
+    {
+        Cdialog *dialog =dynamic_cast<Cdialog*>(base2.get());
+        if ( dialog)
+        {
+            dialog->onCleanup();
+        }
+    }
+    unlock();
+}
+
+/*----------------------------------------------------------------------------*/
+Estatus CdialogList::onButton(SDLMod mod, keybutton sym, Cdialog *parent, Estatus stat)
+{
+    lock();
+    int idx =(int)m_dialogs1.size()-1;
+    while (idx>=0 && stat!=DIALOG_EVENT_PROCESSED && stat!=DIALOG_EVENT_EXIT)
+    {
+        Cdialog *dialog = dynamic_cast<Cdialog*>(m_dialogs1[idx--]);
+        if ( dialog->m_visible ==true)
+        {
+            stat = dialog->onButton( mod, sym);
+            if ( stat==DIALOG_EVENT_EXIT)
+            {
+                parent->stop(0);
+                stat =DIALOG_EVENT_PROCESSED;
+            }
+        }
+    }
+    idx =(int)m_dialogs2.size()-1;
+    while (idx>=0 && stat!=DIALOG_EVENT_PROCESSED && stat!=DIALOG_EVENT_EXIT)
+    {
+        Cdialog *dialog = dynamic_cast<Cdialog*>(m_dialogs2[idx--].get());
+        if ( dialog->m_visible ==true)
+        {
+            stat = dialog->onButton( mod, sym);
+            if ( stat==DIALOG_EVENT_EXIT)
+            {
+                parent->stop(0);
+                stat =DIALOG_EVENT_PROCESSED;
+            }
+        }
+    }
+    unlock();
+    return stat;
+}
+
+/*----------------------------------------------------------------------------*/
+void CdialogList::invalidateSwypeDialogs()
+{
+    lock();
+    for ( CdialogBase *base : m_dialogs1)
+    {
+        CswypeDialog *dialog =dynamic_cast<CswypeDialog*>(base);
+        if ( dialog !=NULL)
+        {
+            dialog->invalidate(-1);
+        }
+    }
+    for ( CdialogBasePtr base2 : m_dialogs2)
+    {
+        CswypeDialog *dialog =dynamic_cast<CswypeDialog*>(base2.get());
+        if ( dialog !=NULL)
+        {
+            dialog->invalidate(-1);
+        }
+    }
+    unlock();
+}
+
+/*----------------------------------------------------------------------------*/
+void CdialogList::onPaint()
+{
+    lock();
+    for ( CdialogBase *base : m_dialogs1)
+    {
+        Cdialog *t=dynamic_cast<Cdialog*>(base);
+        if ( t && t->m_visible)
+        {
+            t->onPaint();
+            t->onPaintButtons();
+        }
+    }
+    for ( CdialogBasePtr base2 : m_dialogs2)
+    {
+        Cdialog *t=dynamic_cast<Cdialog*>(base2.get());
+        if ( t && t->m_visible)
+        {
+            t->onPaint();
+            t->onPaintButtons();
+        }
+    }
+    unlock();
+}
+
+/*----------------------------------------------------------------------------*/
+void CdialogList::onClearScreen()
+{
+    lock();
+    for ( CdialogBase *base : m_dialogs1)
+    {
+        Cdialog *t=dynamic_cast<Cdialog*>(base);
+        if ( t && t->m_visible)
+        {
+            t->onClearScreen();
+        }
+    }
+    for ( CdialogBasePtr base2 : m_dialogs2)
+    {
+        Cdialog *t=dynamic_cast<Cdialog*>(base2.get());
+        if ( t && t->m_visible)
+        {
+            t->onClearScreen();
+        }
+    }
+    unlock();
+}
+
+/*----------------------------------------------------------------------------*/
+void CdialogList::clearScreenAndPaint()
+{
+    lock();
+    for ( CdialogBase *base : m_dialogs1)
+    {
+        Cdialog *dialog =dynamic_cast<Cdialog*>(base);
+        if (dialog && dialog->m_visible)
+        {
+            dialog->onClearScreen();
+            dialog->onPaint();
+            dialog->onPaintButtons();
+        }
+    }
+    for ( CdialogBasePtr base2 : m_dialogs2)
+    {
+        Cdialog *dialog =dynamic_cast<Cdialog*>(base2.get());
+        if (dialog && dialog->m_visible)
+        {
+            dialog->onClearScreen();
+            dialog->onPaint();
+            dialog->onPaintButtons();
+        }
+    }
+    unlock();
+}
+
+/*----------------------------------------------------------------------------*/
+bool CdialogList::onLoopWithSelfDestruct()
+{
+    bool invalidate = false;
+    int n=0;
+    while (n<(int)m_dialogs1.size())
+    {
+        Cdialog *dialog=dynamic_cast<Cdialog*>(m_dialogs1[n]);
+        if (dialog && dialog->isVisible() && dialog->onLoop()==false)
+        {
+            // Close the dialog, not the layers below.
+            if ( dialog->m_alive ==false || dialog->m_selfDestruct==true)
+            {
+                delete dialog;
+                removeDialog(dialog);
+                invalidate = true;
+                break;
+            }
+        }
+        n++;
+    }
+    n=0;
+    while (n<(int)m_dialogs2.size())
+    {
+        Cdialog *dialog =dynamic_cast<Cdialog*>(m_dialogs2[n].get());
+        if (dialog && dialog->isVisible() && dialog->onLoop()==false)
+        {
+            // Close the dialog, not the layers below.
+            if ( dialog->m_alive ==false || dialog->m_selfDestruct==true)
+            {
+                removeDialog(m_dialogs2[n]);
+                invalidate = true;
+                break;
+            }
+        }
+        n++;
+    }
+    return invalidate;
+}
+
+/*----------------------------------------------------------------------------*/
+Cdialog *CdialogList::findDialog( const Cpoint &point)
+{
+    lock();
+    Cdialog *retval = findDialogInternal(point);
+    unlock();
+
+    return retval;
+}
+
+/*----------------------------------------------------------------------------*/
+Cdialog *CdialogList::findDialogInternal( const Cpoint &point)
+{
+    Cdialog *retval =NULL;
+
+    int index = m_dialogs1.size()-1;
+    while (index>=0 && !retval)
+    {
+        Cdialog *dialog=dynamic_cast<Cdialog*>(m_dialogs1[index]);
+        if ( dialog && dialog->m_visible)
+        {
+            if ( dialog->inside( point))
+            {
+                // See if subdialogs inside the found dialog are more suitable.
+                Cdialog *retval2 =dialog->findDialogInChild(point);
+                retval = retval2 ? retval2:dialog;
+            }
+            if (point.x==0 && point.y==0)
+            {
+                retval =dialog;
+            }
+        }
+        index--;
+    }
+    index =m_dialogs2.size()-1;
+    while (index>=0 && !retval)
+    {
+        Cdialog* dialog =dynamic_cast<Cdialog*>(m_dialogs2[index].get());
+        if ( dialog && dialog->m_visible)
+        {
+            if ( dialog->getRect().inside( point))
+            {
+                // See if subdialogs inside the found dialog are more suitable.
+                Cdialog *retval2 =dialog->findDialogInChild(point);
+                retval = retval2 ? retval2:dialog;
+            }
+            if (point.x==0 && point.y==0)
+            {
+                retval =dialog;
+            }
+        }
+        index--;
+    }
+
+    return retval;
+}
+
+/*----------------------------------------------------------------------------*/
 /** Clear list without destroy. */
 void CdialogList::clear()
 {
-	m_dialogs.clear();
+    lock();
+	m_dialogs1.clear();
+	m_dialogs2.clear();
+    unlock();
 }
 
-/** Paint all dialogs */
-bool CdialogList::onPaint()
-{
-	bool retVal =false;
-	for ( CdialogBase *p : m_dialogs)
-	{
-		Cdialog *d = dynamic_cast<Cdialog*>(p);
-		if (d && d->isInvalidated() && d->m_myGraphics)
-		{
-			d->onPaint();
-			retVal =true;
-		}
-	}
-	return retVal;
-}
-
-/** Paint all dialogs */
-void CdialogList::onRender()
-{
-	for ( CdialogBase *p : m_dialogs)
-	{
-		Cdialog *d = dynamic_cast<Cdialog*>(p);
-		if (d)
-		{
-			if (d->m_myGraphics)
-			{
-				d->onRender();
-			}
-			else
-			{
-				d->invalidate(false);
-				d->onPaint();
-			}
-		}
-	}
-}
-
-dialogBaseIterator CdialogList::begin()
-{
-	return m_dialogs.begin();
-}
-
-dialogBaseIterator CdialogList::end()
-{
-	return m_dialogs.end();
-}
-
-Estatus CdialogList::onButton(keymode mod, keybutton sym)
-{
-	for ( CdialogBase *p : m_dialogs)
-	{
-		Cdialog *d = dynamic_cast<Cdialog*>(p);
-		if (d)
-		{
-			switch( d->onButton( mod, sym) )
-			{
-			case DIALOG_EVENT_EXIT:
-				return DIALOG_EVENT_EXIT;
-			case DIALOG_EVENT_GENERAL:
-				return DIALOG_EVENT_GENERAL;
-			case DIALOG_EVENT_OPEN:
-				continue;
-			case DIALOG_EVENT_PROCESSED:
-				return DIALOG_EVENT_PROCESSED;
-			}
-		}
-	}
-	return DIALOG_EVENT_OPEN;
-}
-
+/*----------------------------------------------------------------------------*/
 /** @brief Dialog stops by the user.
  *  @param interface [in] Dialog to remove.
  */
 void CdialogList::removeDialog( CdialogBase *interface)
 {
 	lock();
-	//m_repeatTimer.stop();
-	//m_mousePressedLeft =false;
-	//m_mouseStatus =MOUSE_RELEASED;
-	int size =(int)m_dialogs.size();
-	for ( int n=0; n<size;)
+	int size =(int)m_dialogs1.size();
+	int n=0;
+	while (n<size)
 	{
-		if ( m_dialogs[n] ==interface)
+		if ( m_dialogs1[n] ==interface)
 		{
-			m_dialogs.erase( m_dialogs.begin()+n);
+			m_dialogs1.erase( m_dialogs1.begin()+n);
 			size--;
 			break;
 		}
@@ -156,30 +449,77 @@ void CdialogList::removeDialog( CdialogBase *interface)
 	unlock();
 }
 
+/*----------------------------------------------------------------------------*/
+/** @brief Dialog stops by the user.
+ *  @param interface [in] Dialog to remove.
+ */
+void CdialogList::removeDialog( CdialogBasePtr interface)
+{
+    lock();
+    int size =(int)m_dialogs2.size();
+    for ( int n=0; n<size;)
+    {
+        if ( m_dialogs2[n].get() ==interface.get())
+        {
+            m_dialogs2.erase( m_dialogs2.begin()+n);
+            size--;
+            break;
+        }
+        else
+        {
+            n++;
+        }
+    }
+    unlock();
+}
+
+/*----------------------------------------------------------------------------*/
 /** @brief New dialog created by the user.
  *  @param interface [in] What dialog to add.
  */
 void CdialogList::addDialog( CdialogBase *interface)
 {
-	// CdialogEvent::newDialog %s", interface->getName().c_str());
 	if ( interface )
 	{
 		lock();
-		int size =(int)m_dialogs.size();
+		int size =(int)m_dialogs1.size();
 		for ( int n=0; n<size;n++)
 		{
-			if ( m_dialogs[n] ==interface)
+			if ( m_dialogs1[n] ==interface)
 			{
 				// CdialogList::addDialog  Dialog already found %d %d!!", n, size);
 				return;
 			}
 		}
-		m_interface =interface;
-		m_dialogs.push_back( interface);
+		m_dialogs1.push_back( interface);
 		unlock();
 	}
 }
 
+/*----------------------------------------------------------------------------*/
+/** @brief New dialog created by the user.
+ *  @param interface [in] What dialog to add.
+ */
+void CdialogList::addDialog( CdialogBasePtr interface)
+{
+    if ( interface.get() )
+    {
+        lock();
+        int size =(int)m_dialogs2.size();
+        for ( int n=0; n<size;n++)
+        {
+            if ( m_dialogs2[n].get() ==interface.get())
+            {
+                // CdialogList::addDialog  Dialog already found %d %d!!", n, size);
+                return;
+            }
+        }
+        m_dialogs2.push_back( interface);
+        unlock();
+    }
+}
+
+/*----------------------------------------------------------------------------*/
 /** @brief Calculate last dialog.
  *  @return pointer to dialog.
  */
@@ -188,15 +528,15 @@ CdialogBase *CdialogList::firstDialog()
 	CdialogBase *ret =NULL;
 
 	lock();
-	if ( m_dialogs.size() !=0)
+	if ( m_dialogs1.size() !=0)
 	{
-		ret =m_dialogs[0];
+		ret =m_dialogs1[0];
 	}
 	unlock();
-	// first dialog =%s", ret? ret->getName().c_str():"NULL");
 	return ret;
 }
 
+/*----------------------------------------------------------------------------*/
 /** @brief Calculate last dialog.
  *  @return pointer to dialog.
  */
@@ -205,56 +545,10 @@ CdialogBase *CdialogList::lastDialog()
 	CdialogBase *ret =NULL;
 
 	lock();
-	int n=(int)m_dialogs.size();
+	int n=(int)m_dialogs1.size();
 	if ( n !=0)
 	{
-		ret =m_dialogs[ n-1];
-	}
-	unlock();
-	// last dialog =%s", ret? ret->getName().c_str():"NULL");
-	return ret;
-}
-
-/** @brief Calculate next dialog.
- *  @param current [in] Start from current.
- *  @return next dialog.
- */
-CdialogBase *CdialogList::nextDialog( CdialogBase *current)
-{
-	CdialogBase *ret =NULL;
-
-	lock();
-	int n=(int)m_dialogs.size();
-	for ( int x=0; x<n-1; x++)
-	{
-		if ( m_dialogs[x]==current)
-		{
-			ret =m_dialogs[x+1];
-			break;
-		}
-	}
-	unlock();
-	// next dialog =ret->getName()
-	return ret;
-}
-
-/** @brief Calculate previous dialog.
- *  @param current [in] Start from current.
- *  @return previous dialog.
- */
-CdialogBase *CdialogList::previousDialog( CdialogBase *current)
-{
-	CdialogBase *ret =NULL;
-
-	lock();
-	int n=(int)m_dialogs.size();
-	for ( int x=1; x<n; x++)
-	{
-		if ( m_dialogs[x]==current)
-		{
-			ret =m_dialogs[x-1];
-			break;
-		}
+		ret =m_dialogs1[ n-1];
 	}
 	unlock();
 	return ret;

@@ -97,7 +97,7 @@ bool CafterGlowList::update( bool pressed, const Cpoint &mouse)
 				retVal =!ti->last_time;
 				ti->last_time =m_time_now;
 				// Check if the button is released
-				if ( !pressed || !ti->object->m_rect.inside( q))
+				if ( !pressed || !ti->object->inside( q))
 				{
 					ti->pressed =false;
 					ti->startTime =m_time_now;
@@ -143,7 +143,7 @@ bool CafterGlowList::update( bool pressed, const Cpoint &mouse)
  *  @param factor [out] Touch value for this one. 0=nothing, 1..99 =pressing, 100=pressed, 101..200 =releasing
  *  @return true when the button was found.
  */
-bool CafterGlowList::getFactor( CdialogObject *object, int *factor)
+bool CafterGlowList::getFactor( CdialogObjectPtr object, int *factor)
 {
 	*factor=0;
 	bool retVal =false;
@@ -203,13 +203,14 @@ int CafterGlowList::size()
 /** @brief A new button is pressed, let is glow some time after we release it.
  *  @param object [in] The new button pressed
  */
-void CafterGlowList::addObject( CdialogObject *object)
+void CafterGlowList::addObject( CdialogObjectPtr object)
 {
 	lock();
 	for ( int n=0; n<(int)m_info.size(); n++)
 	{
 		if (m_info[n].object ==object)
 		{
+		    unlock();
 			return;
 		}
 	}

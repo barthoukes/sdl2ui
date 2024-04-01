@@ -1,14 +1,14 @@
 /*============================================================================*/
-/**  @file       sdl_world.h
- **  @ingroup    zhongcan_sdl
- **  @brief		 Default dialog.
+/**  @file      sdl_horizontal_line.hpp
+ **  @ingroup   user_interface
+ **  @brief		Draw horizontal line.
  **
- **  Paint the world, with dialogs and message boxes
+ **  Create and show buttons.
  **
  **  @author     mensfort
  **
  **  @par Classes:
- **              Cworld
+ **              ChorizontalLine
  */
 /*------------------------------------------------------------------------------
  ** Copyright (C) 2011, 2014, 2015
@@ -38,61 +38,46 @@
 #pragma once
 
 /*------------- Standard includes --------------------------------------------*/
-#include <map>
 #include <memory>
-#include <vector>
 #include <string>
-#include <SDL.h>
-#include <pthread.h>
-#include "my_thread.h"
-#include "sdl_world_interface.h"
-#include "sdl_dialog_list.h"
-#include "sdl_key_file.h"
+#include "sdl_background.h"
+//#include "sdl_keybutton.h"
+//#include "sdl_graphics.h"
+#include "sdl_dialog_object.h"
+//#include "sdl_rectangle.h"
+//#include "sdl_text.h"
+//#include "sdl_label.h"
+//#include "sdl_image.h"
 
+/// @brief  Forward declaration.
 class Cdialog;
-class CmessageBox;
 
-/// @brief Dialog on screen.
-class Cworld : public Iworld
+/// @brief  Create and display buttons.
+class ChorizontalLine : public CdialogObject
 {
 public:
-	Cworld(std::shared_ptr<Cgraphics> mainGraph);
-	virtual ~Cworld();
-	void init();
-	void invalidate();
-	void paintAll();
-	void clean();
-	void addDialog( Cdialog *dialog);
-	std::shared_ptr<Cgraphics> graphics();
-	void registerMessageBox(Cdialog *child);
-	void unregisterMessageBox(Cdialog *child);
-	void invalidateAll();
-	void notifyInvalidate();
-	void setActiveDialog( Cdialog *dialog);
-	bool onLoop();
-	void lock() { m_lock.lock(); }
-	void unlock() { m_lock.unlock(); }
-	void onCleanup();
-	Estatus tryButton(keymode mod, keybutton sym);
-	Cdialog *findDialog( const Cpoint &p);
-	void onRender();
-	void checkInMainThread();
+	ChorizontalLine( Cdialog *parent,
+			         const Crect &rect,
+			         int lineWidth,
+			         keybutton code,
+					 colour back1,
+					 colour back2);
+	virtual ~ChorizontalLine();
 
 public:
-	CdialogList	m_dialogs;
-	Cdialog 	*m_active_dialog;
-	CdialogList m_message_box;
-	CdialogList m_dialog_list;
-	static pthread_t	m_main_thread;
-	std::shared_ptr<Cgraphics> m_main_graph;
-	CmyLock m_lock;
-protected:
-	static CkeyFile		m_key_file;			///< File to repeat key pressed.
+	virtual void onPaint( int touch);
+	void 	setLineColour( colour b1);
+	void	setBackgroundColour( colour background, colour background2=COLOUR_DARKGRAY);
+	void 	roundedRectangle( int radius);
 
-private:
-	Cpoint		m_drag_point;		///< point to drag
-	bool		m_invalidate;		///< Need to repaint
-	static int 	m_init;				///< How many worlds?
+protected:
+	void 	paintBackground( int touch);
+	void	paintBorder( EborderType border, int spacing, int radius, int touch);
+
+protected:
+	Cbackground			m_background;	///< Square inside.
+	colour		 		m_lineColour; ///< Colour text. Almost obsolete.
+	int					m_lineWidth; ///< Width of the lines.
 };
 
-/* APPLICATION_DIALOG_H_ */
+typedef std::shared_ptr<ChorizontalLine> ChorizontalLinePtr;

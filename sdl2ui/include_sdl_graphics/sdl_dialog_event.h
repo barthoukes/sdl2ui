@@ -40,18 +40,27 @@
 /*------------- Standard includes --------------------------------------------*/
 #include <string>
 #include <SDL.h>
+#include <atomic>
 #include <pthread.h>
 #include <queue>
 #include <vector>
-#include <singleton.h>
+#include "singleton.hpp"
 
 #include "sdl_font.h"
-//#include "zhongcan_defines.h"
-#include "sdl_dialog_object.h"
-#include "my_thread.h"
-#include "timeout.h"
+#include "sdl_rect.h"
+#include "my_thread.hpp"
+#include "timeout.hpp"
 #include "sdl_key_file.h"
-#include "sdl_types.h"
+#include "sdl_dialog_object.h"
+
+/// @brief Status for message when sent to any client.
+typedef enum
+{
+	DIALOG_EVENT_PROCESSED,		///< Event processed, stop sending.
+	DIALOG_EVENT_OPEN,			///< Event still open.
+	DIALOG_EVENT_GENERAL,		///< Dialog can be sent to all.
+	DIALOG_EVENT_EXIT			///< Dialog request to stop the dialog.
+} Estatus;
 
 /// @brief Status for the mouse.
 typedef enum
@@ -59,7 +68,6 @@ typedef enum
 	MOUSE_RELEASED,				///< No activity.
 	MOUSE_RELEASE_DEBOUNCE,		///< Releasing the mouse.
 	MOUSE_START_DRAG,			///< Wait a second before starting to drag.
-//	MOUSE_START_PAINT,			///< Paint an object.
 	MOUSE_START_SCROLL_OR_DRAG,	///< Start a scroll dialog.
 	MOUSE_SCROLL,				///< Scrolling window.
 	MOUSE_PAINT,				///< Painting with finger on object
@@ -104,6 +112,7 @@ typedef enum
 	EVENT_MOUSE_CLICK,		///< Short click for a button.
 	EVENT_WHEEL_DOWN,		///< Wheel rotate (mouse).
 	EVENT_WHEEL_UP,			///< Wheel rotate (mouse).
+	EVENT_BARCODE,          ///< Barcode event.
 	EVENT_QUIT,				///< Quit application.
 	EVENT_INVALID,
 } EventType;
@@ -122,7 +131,7 @@ public:
 	, which( 0)
 	{
 	}
-	Cevent( keybutton key, keymode m, bool testing=false)
+	Cevent( keybutton key, SDLMod m, bool testing=false)
 	: type( EVENT_KEY_PRESS)
 	, status( testing ? POLL_TESTING:POLL_USER)
 	, point( 0,0)
@@ -140,6 +149,16 @@ public:
 	, which( 0)
 	{
 	}
+	Cevent( const std::string &barcode, bool testing=false)
+	: type(EVENT_BARCODE)
+	, status( testing ? POLL_TESTING:POLL_USER)
+	, point( Cpoint(0,0))
+	, button( KEY_NONE)
+	, mod( KMOD_NONE)
+	, barcode(barcode)
+	, which( 0)
+	{
+	}
 	~Cevent() {}
 	std::string toString();
 
@@ -148,12 +167,13 @@ public:
 	EpollStatus status;
 	Cpoint		point;
 	keybutton   button;
-	keymode 	mod;
+	SDLMod      mod;
+	std::string barcode;
 	int			which;
 };
 
 /// @brief Queue for events.
-class CeventQueue
+class CeventQueue : private CmyLock
 {
 public:
 	CeventQueue();
@@ -165,9 +185,8 @@ public:
 	bool empty();
 
 private:
-	int m_size;
+	std::atomic<int> m_size;
 	std::queue<Cevent> m_eventList; ///< All events in queue.
-	CmyLock m_lock; ///< Lock for this queue.
 };
 
 /// @brief Interface for keyboard/mouse events.
@@ -178,24 +197,26 @@ public:
 	virtual ~CeventInterface() {}
 
 public:
+	virtual void lockEvent() =0;
+	virtual void unlockEvent() =0;
 	virtual Estatus onEvent( const Cevent &event) =0;
-	virtual void onStartDrag( CdialogObject * movingObject) =0; // reentrant
+	virtual void onStartDrag( CdialogObjectPtr movingObject) =0; // reentrant
 	virtual void onStopDrag() =0; // reentrant
 	void addDialog( CeventInterface	*interface); // reentrant
 	void removeDialog( CeventInterface	*interface);
 	void stopDialog( CeventInterface *interface);
-	virtual CdialogObject *findObject( const Cpoint &p) =0;
+	virtual CdialogObjectPtr findObject( const Cpoint &p) =0;
 	virtual keybutton findButton( const Cpoint &p) =0;
-	//virtual Cdialog *findDialog( const Cpoint &p) =0;
 	virtual bool isSwypeDialog( const Cpoint &p) =0;
 	virtual void onMouseWheel(bool Up, bool Down) =0;
 	virtual void scrollDialog( const Cpoint &start, const Cpoint &distance) =0;
-	virtual void dragObject( CdialogObject * movingObject, const Cpoint &to) =0;
+	virtual void dragObject( CdialogObjectPtr movingObject, const Cpoint &to) =0;
 	virtual std::string getName() =0;
 	virtual bool spaceIsLanguage() =0;
 	virtual bool isScrollDragDialog( const Cpoint &p) =0;
 	virtual bool isHorizontalScrollDialog( const Cpoint &p) =0;
 	virtual void notifyTouch( const Cpoint &p)=0;
+    virtual void onBarcode( const std::string &barcode) =0;
 };
 
 /// @brief Create events for a dialog on screen.
@@ -207,31 +228,40 @@ public:
 	CdialogEvent();
 	virtual ~CdialogEvent();
 	EpollStatus pollEvent( CeventInterface *callback);
-	virtual void stop() { CmyThread::stop(); }
+	virtual void stop();
 	virtual void work();
 	void stopDrag();
-	Cpoint lastMouse() { return m_lastMousePos; }
-	bool pressMouse() { return m_isPressed; }
-	EmouseStatus getStatus() { return m_mouseStat; }
-	void startIdiot() { m_idiot =true; }
-	void forceDrag( const Cpoint &dragPoint) { m_dragPoint =dragPoint; m_mouseStat =MOUSE_DRAG; }
-	void registerActiveDialog( CeventInterface *interface); //{ m_interface =interface; }
-	CeventInterface *getInterface() { return m_interface; }
-	void handleEvent( CeventInterface *callback, const Cevent &event);
+	Cpoint lastMouse() const;
+	bool isMousePressed() const;
+	EmouseStatus getStatus() const;
+	void startIdiotTesting();
+	void registerActiveDialog( CeventInterface *interface);
+    void forceDrag( const Cpoint &dragPoint);
+	CeventInterface *getInterface();
+    void handleBarcode( const std::string &barcode);
+	///< Test interface
+    Cpoint getMousePosition() { return m_lastMousePos; }
+	void setTouchBottom(int bottom);
 
 private:
-	void handleEvent( Cevent &event);
+	// Raw events
+	void stateMachine();
 	void createRandomEvent();
+	void logState();
+	void handleRawEvent( Cevent &event);
+  	  void handleRawKeyPress( SDLMod mod, keybutton key);
+	  void handleRawKeyRelease();
+	  void handleRawMousePress( const Cpoint &p);
+	  void handleRawMouseRelease( const Cpoint &p);
+	  void handleRawMouseMove( const Cpoint &p);
 	void flushEvents();
-	void handleKeyPress( keymode mod, keybutton key);
-	void handleKeyRelease();
-	void handleMousePress( const Cpoint &p);
-	void handleMouseRelease( const Cpoint &p);
-	void handleMouseMove( const Cpoint &p);
-	void handleMousePress( CeventInterface *callback, const Cevent &c);
-	void handleMouseRelease( CeventInterface *callback, const Cevent &c);
-	void handleMouseLong( CeventInterface *callback, const Cevent &c);
-	void handleMouseMove( CeventInterface *callback, const Cevent &c);
+	// Finall events
+	void handlePostEvent( CeventInterface *callback, const Cevent &event);
+  	  void handlePostMousePress( CeventInterface *callback, const Cevent &c);
+	  void handlePostMouseRelease( CeventInterface *callback, const Cevent &c);
+	  void handlePostMouseLong( CeventInterface *callback, const Cevent &c);
+	  void handlePostMouseMove( CeventInterface *callback, const Cevent &c);
+	void updateLastMouse( const SDL_Event &event);
 
 private:
 	CeventInterface		*m_interface;		///< Which interface is active.
@@ -263,6 +293,7 @@ private:
 	Cpoint				m_press;			///< Where we press the screen.
 	bool				m_isPressed;		///< Is the mouse pressed?
 	bool				m_longDebounced;	///< Long debounce time.
+    int                 m_touchBottom;      ///< Bottom of touch screen
 public:
 	bool				m_idiot;			///< Idiot test.
 	Cpoint				m_debugPosition;	///< Position to debug

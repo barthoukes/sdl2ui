@@ -46,48 +46,47 @@ SsingleFont emptyFont =
 		{ "", 0, NULL };
 
 /// @brief Find a single font.
-SsingleFont CtextFont::findFont( const std::string &fontName, int pixels)
+SsingleFont CtextFont::findFont(const std::string &fontName, int fontSize)
 {
 	for ( int a=0; a<(int)m_fonts.size(); a++)
 	{
-		if ( m_fonts[a].pixels ==pixels && m_fonts[a].name ==fontName)
+		if (m_fonts[a].fontSize == fontSize && m_fonts[a].fontName == fontName)
 		{
 			return m_fonts[a];
 		}
 	}
 	std::string s=Cgraphics::m_defaults.font_path + fontName;
     if (!TTF_WasInit()) TTF_Init(); // Initilize SDL_ttf
-	TTF_Font *font =TTF_OpenFont( s.c_str(), pixels);
+	TTF_Font *font =TTF_OpenFont(s.c_str(), fontSize);
 	if (!font)
 	{
-		const char *err = TTF_GetError();
         return emptyFont;
 	}
 	SsingleFont sf;
 	sf.font =font;
-	sf.name =fontName;
-	sf.pixels =pixels;
+	sf.fontName = fontName;
+	sf.fontSize = fontSize;
 	m_fonts.push_back( sf);
 	return sf;
 }
 
 /// @brief Construct a font.
-CtextFont::CtextFont( std::string localFontName, int localPixels,
-					  std::string chineseFontName, int chinesePixels)
+CtextFont::CtextFont( std::string localFontName, int localFontSize,
+					  std::string chineseFontName, int chineseFontSize)
 {
-	if ( localPixels ==0)
+	if ( localFontSize == 0)
 	{
-		localPixels =chinesePixels;
-		localFontName =chineseFontName;
+		localFontSize = chineseFontSize;
+		localFontName = chineseFontName;
 	}
-	m_font.local =findFont( localFontName, localPixels);
-	if ( chineseFontName =="" || chinesePixels ==0)
+	m_font.local =findFont(localFontName, localFontSize);
+	if ( chineseFontName == "" || chineseFontSize == 0)
 	{
-		m_font.chinese =m_font.local;
+		m_font.chinese = m_font.local;
 	}
 	else
 	{
-		m_font.chinese =findFont( chineseFontName, chinesePixels);
+		m_font.chinese =findFont( chineseFontName, chineseFontSize);
 	}
 }
 
@@ -101,40 +100,37 @@ CtextFont::CtextFont( const char *fname, bool relative_to_screen)
 	std::string name(fname);
 	std::string chineseFontName;
 	std::string localFontName;
-	int chinesePixels =0;
-	int localPixels =0;
+	int chineseFontSize = 0;
+	int localFontSize =0;
 	if ( Cgraphics::m_defaults.get_font)
 	{
-		Cgraphics::m_defaults.get_font( name, localFontName, chineseFontName, localPixels, chinesePixels, relative_to_screen);
+		Cgraphics::m_defaults.get_font( name, localFontName, chineseFontName, localFontSize, chineseFontSize, relative_to_screen);
 	}
 	if ( chineseFontName =="")
 	{
 		chineseFontName =localFontName;
 	}
-	if ( localPixels ==0)
+	if (localFontSize == 0)
 	{
-		localPixels =chinesePixels;
-		localFontName =chineseFontName;
+		localFontSize = chineseFontSize;
+		localFontName = chineseFontName;
 	}
-	if ( chinesePixels ==0)
+	if (chineseFontSize ==0)
 	{
-		chinesePixels =localPixels;
-		chineseFontName =localFontName;
+		chineseFontSize = localFontSize;
+		chineseFontName = localFontName;
 	}
-	m_font.local =findFont( localFontName, localPixels);
-	m_font.chinese =findFont( chineseFontName, chinesePixels);
+	m_font.local =findFont(localFontName, localFontSize);
+	m_font.chinese =findFont(chineseFontName, chineseFontSize);
 }
 
 /// @brief Free all fonts to prevent memory leak.
 void CtextFont::closeFonts()
 {
 	//Log.write( "CtextFont::closeFonts  Closing.");
-	for ( int a=0; a<(int)m_fonts.size(); a++)
+	for (auto font : m_fonts)
 	{
-		TTF_CloseFont( m_fonts[a].font);
-		m_fonts[a].name ="";
-		m_fonts[a].pixels =0;
-		m_fonts[a].font =NULL;
+		TTF_CloseFont( font.font);
 	}
 	m_fonts.clear();
 	if (TTF_WasInit()) TTF_Quit(); // Deinitilize SDL_ttf

@@ -56,6 +56,7 @@ public:
 	int		length();
 	void	setText( const std::string &txt);
 	void    calculateSize( const Crect &rect);
+    virtual void setRect( const Crect &rect);
 
 private:
 	std::string   m_label; 	///< Text on the label

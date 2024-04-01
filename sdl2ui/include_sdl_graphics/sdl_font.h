@@ -35,19 +35,20 @@
 #include "SDL_ttf.h"
 #include <vector>
 #include <string>
-//#include "zhongcan_defines.h"
 
 /// @brief structure to put loaded fonts in an array for quick access.
 typedef struct
 {
-	std::string 	name;
-	int				pixels;
+public:
+	std::string 	fontName;
+	int				fontSize;
 	TTF_Font		*font;
 } SsingleFont;
 
 /// @brief structure to put loaded fonts in an array for quick access.
 typedef struct
 {
+public:
 	SsingleFont		local;
 	SsingleFont		chinese;
 } Sfont;
@@ -56,19 +57,23 @@ typedef struct
 class CtextFont
 {
 public:
-	CtextFont( std::string localFontName, int localPixels,
-			  std::string chineseFontName, int chinesePixels); // FONT_GKAI00, 24
+	CtextFont(std::string localFontName, int localFontSize,
+			  std::string chineseFontName, int chineseFontSize); // FONT_GKAI00, 24
 	CtextFont( const char *name, bool relative_to_screen=true);
 	virtual ~CtextFont() {}
 	operator Sfont () { return m_font; }
 	TTF_Font *font();
 	static void closeFonts();
 
+protected:
+	static SsingleFont findFont( const std::string &fontName, int fontSize);
+
 private:
-	static SsingleFont findFont( const std::string &fontName, int pixels);
 
 	static std::vector<SsingleFont> m_fonts;
 	Sfont  m_font;
+
+	friend class Ctext;
 };
 
 /* TEXT_FONT_H_ */

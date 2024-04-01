@@ -51,7 +51,7 @@ public: // override
 	virtual void onPaintUnit( int unit, const Crect &location) =0;
 	void onPaintBackground( int index, const Crect &location);
 	void invalidateIndex( int index);
-	CdialogObject * findObject( const Cpoint &p);
+	CdialogObjectPtr findObject( const Cpoint &p);
 	int getSpan() { return m_span; }
 	virtual size_t size();
 	virtual size_t rows();
@@ -65,10 +65,8 @@ public: // New functions.
 
 private:
 	virtual void calculateSurfacePosition();
-	virtual void paintSurfaceTop();
-	virtual bool paintSurfaceRight();
-	virtual bool paintSurfaceLeft();
-	virtual void paintSurfaceBottom();
+	void paintVertical( SDL_Rect &rct, int offx, int offy);
+    void paintHorizontal( SDL_Rect &rct, int offx, int offy);
 
 private:
 	int			m_span; ///< The number of items horizontal/vertical in a vertical/horizontal scroll dialog.
@@ -96,7 +94,7 @@ public:
 		{
 			return;
 		}
-		C2DswypeDialog *dlg=dynamic_cast<C2DswypeDialog*>( m_parent);
+		C2DswypeDialog *dlg=dynamic_cast<C2DswypeDialog*>( m_pParent);
 		if ( dlg && dlg->m_visible==true)
 		{
 			Crect r( p.left(), p.top(), dlg->width()/dlg->getSpan(), dlg->itemBlocks());

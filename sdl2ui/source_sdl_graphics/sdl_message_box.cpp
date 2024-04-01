@@ -37,10 +37,12 @@
 
 /*------------- Standard includes --------------------------------------------*/
 #include <assert.h>
+#include "lingual.h"
+#include "sdl_audio.h"
+#include "timeout.hpp"
+#include "timestamp.hpp"
 #include "sdl_message_box.h"
-#include "timeout.h"
 #include "sdl_dialog_list.h"
-#include "timestamp.h"
 
 #define BTN_WIDTH  (Cgraphics::m_defaults.button_height+2)
 #define BTN_HEIGHT (Cgraphics::m_defaults.button_height)
@@ -65,17 +67,19 @@ void *messagebox_interrupt(void *mbx)
  */
 CmessageBox::CmessageBox( const std::string &name, textId id)
 : Cdialog( NULL, name, Crect( 56, 4, 30, 18))
-, m_ok( this, Crect( 0,0, BTN_WIDTH,BTN_HEIGHT), KEY_CR, Cgraphics::m_defaults.icon_ok48)
-, m_cancel( this, Crect( 0,0, BTN_WIDTH,BTN_HEIGHT), KEY_CANCEL, Cgraphics::m_defaults.icon_cancel48)
+, m_factor(1)
+, m_ok( std::make_shared<Cimage>( this, Crect( 0,0, BTN_WIDTH,BTN_HEIGHT), KEY_CR, Cgraphics::m_defaults.icon_ok48))
+, m_cancel( std::make_shared<Cimage>( this, Crect( 0,0, BTN_WIDTH,BTN_HEIGHT), KEY_CANCEL, Cgraphics::m_defaults.icon_cancel48))
+, m_language( std::make_shared<Cimage>( this, Crect( 0,0, BTN_WIDTH,BTN_HEIGHT), KEY_LANG, Cgraphics::m_defaults.icon_language48))
 {
 	m_push =true;
 
-	m_text =Cgraphics::m_defaults.get_translation( id, Cgraphics::m_defaults.country);
+	m_text = getTranslation( id, Cgraphics::m_defaults.country);
 	setFlags( MB_TIME2|MB_BEEP);
-	registerMessageBox();
+	registerMessageBx();
 	if ( m_flags & MB_DARKEN)
 	{
-		m_graphics->darken( 0,0,0,0);
+		m_mainGraph->darken( 0,0,0,0);
 	}
 
 	if ( !(m_flags & MB_RETURN_IMMEDIATELY))
@@ -84,18 +88,11 @@ CmessageBox::CmessageBox( const std::string &name, textId id)
 	}
 	else if ( m_in_main_thread ==true)
 	{
-		m_world->lock();
 		onInit();
 		onClearScreen();
 		onPaintButtons();
 		onPaint();
-		if (m_render_after_paint)
-		{
-			onRender();
-		}
 		onDisplay();
-
-		m_world->unlock();
 	}
 }
 
@@ -106,11 +103,11 @@ CmessageBox::CmessageBox( const std::string &name, textId id)
 /// @post       Message box removed, should not be displayed anymore.
 ///
 /*============================================================================*/
-void CmessageBox::registerMessageBox()
+void CmessageBox::registerMessageBx()
 {
 	m_push =true;
 	m_isMessageBox=true;
-	m_world->registerMessageBox(this);
+	Cdialog::registerMessageBox(this);
 }
 
 /*============================================================================*/
@@ -124,10 +121,9 @@ void CmessageBox::registerMessageBox()
 /*============================================================================*/
 int CmessageBox::onExecute( Cdialog *parent)
 {
-	CdialogBase *a;
-	(void)parent;
+	int refresh=3;
+	if (parent) { m_parent =parent; }
 
-	// "begin CmessageBox::onExecute:%s %d", m_name.c_str(), m_in_main_thread);
 	m_running =true;
 
 	if (onInit() == false)
@@ -150,21 +146,20 @@ int CmessageBox::onExecute( Cdialog *parent)
   		//if (m_invalidate && m_in_main_thread)
   		if ( m_in_main_thread)
 		{
-			m_world->lock();
-			if ( m_visible)
+			lock();
+			if ( m_visible && (m_invalidate.load() || refresh>0))
 			{
+				if (refresh)
+				{
+					refresh--;
+				}
 				onClearScreen();
 				onPaintButtons();
 				onPaint();
-				if (m_render_after_paint)
-				{
-					onRender();
-				}
-				m_invalidate =false;
+				onDisplay();
 			}
-			onDisplay();
 			m_invalidate =false;
-			m_world->unlock();
+			unlock();
 		}
 		if ( onLoop() ==false)
 		{
@@ -185,19 +180,12 @@ int CmessageBox::onExecute( Cdialog *parent)
 					break;
 				}
 			}
-#if 0
-			if ( m_idiot)
-			{
-				no_action =false;
-				createRandomEvent(&m_event);
-				onEvent(&m_event);
-			}
-#endif
 			if ( !m_running)
 			{
 				break;
 			}
-			if ( m_touchList.update( CdialogEvent::Instance()->pressMouse(), CdialogEvent::Instance()->lastMouse()))
+			if ( m_touchList.update( CdialogEvent::Instance()->isMousePressed(),
+			                         CdialogEvent::Instance()->lastMouse()))
 			{
 				invalidate();
 			}
@@ -212,23 +200,13 @@ int CmessageBox::onExecute( Cdialog *parent)
 		}
 	}
 	stopExecute();
-	// "Cdialog::onExecute onCleanUp");
 	onCleanup();
-	for ( a=m_children.firstDialog(); a !=NULL; a =m_children.nextDialog( a))
-	{
-		Cdialog *d=dynamic_cast<Cdialog*>(a);
-		if (d) d->onCleanup();
-	}
-	// ("end Cdialog::onExecute:%s %d", m_name.c_str(), m_exitValue);
-	delay(50);
+	m_children.onCleanup();
+	delay(10);
 	if ( m_selfDestruct)
 	{
 		m_alive =false;
 	}
-	//if ( parent !=NULL)
-	//{
-	//	dlgLock();
-	//}
 
 	return m_exitValue;
 }
@@ -246,6 +224,29 @@ void CmessageBox::stop(int exitValue)
 
 /*============================================================================*/
 ///
+/// @brief      Get flags for message box.
+/// @post       Flags returned.
+///
+/*============================================================================*/
+int CmessageBox::getFlags() const
+{
+    return m_flags;
+}
+
+/*----------------------------------------------------------------------------*/
+keybutton CmessageBox::getObjectKey() const
+{
+    return m_key;
+}
+
+/*----------------------------------------------------------------------------*/
+keybutton CmessageBox::getLastKey() const
+{
+    return m_lastKey;
+}
+
+/*============================================================================*/
+///
 /// @brief 		Set flags for message box.
 /// @param		FLAGS [in] Flags for data
 /// @post       Flags set, maybe popup sound played.
@@ -256,7 +257,7 @@ void CmessageBox::setFlags( int FLAGS)
 	m_flags =FLAGS;
 	if ( m_flags & MB_BEEP)
 	{
-		Caudio::Instance()->play( Cgraphics::m_defaults.audio_popup);
+		CREATE_SOUND( Cgraphics::m_defaults.audio_popup);
 		m_flags &=~MB_BEEP;
 	}
 
@@ -292,11 +293,19 @@ void CmessageBox::setFlags( int FLAGS)
 	}
 	if ( m_flags & MB_OK)
 	{
-		registerObject( &m_ok);
+		registerObject( m_ok);
 	}
 	if ( m_flags & MB_QUIT)
 	{
-		registerObject( &m_cancel);
+		registerObject( m_cancel);
+	}
+	if ( m_flags & MB_LANGUAGE)
+	{
+		registerObject( m_cancel);
+	}
+	if ( m_flags & MB_LANGUAGE)
+	{
+		registerObject( m_language);
 	}
 }
 
@@ -312,42 +321,39 @@ void CmessageBox::setFlags( int FLAGS)
 CmessageBox::CmessageBox( const std::string &name, int x, int y, int w, int h,
 		const std::string &Text, int FLAGS) :
 	Cdialog( NULL, name, Crect(x, y, w, h))
-, m_ok( this, Crect( 0,0, BTN_WIDTH,BTN_HEIGHT), KEY_CR, Cgraphics::m_defaults.icon_ok48)
-, m_cancel( this, Crect( 0,0, BTN_WIDTH,BTN_HEIGHT), KEY_CANCEL, Cgraphics::m_defaults.icon_cancel48)
+, m_factor( (FLAGS&MB_BIG_BUTTONS) ? 2:1)
+, m_ok( std::make_shared<Cimage>( this, Crect( 0,0, BTN_WIDTH*m_factor,BTN_HEIGHT*m_factor), KEY_CR, Cgraphics::m_defaults.icon_ok48))
+, m_cancel( std::make_shared<Cimage>( this, Crect( 0,0, BTN_WIDTH*m_factor,BTN_HEIGHT*m_factor), KEY_CANCEL, Cgraphics::m_defaults.icon_cancel48))
+, m_language( std::make_shared<Cimage>( this, Crect( 0,0, BTN_WIDTH*m_factor,BTN_HEIGHT*m_factor), KEY_SPACE, Cgraphics::m_defaults.icon_language48))
 {
 	m_text =Text;
 	setFlags(FLAGS);
-	registerMessageBox();
+	registerMessageBx();
 	if ( m_flags & MB_DARKEN)
 	{
 
-		graphics()->darken(0,0,0,0);
+		m_mainGraph->darken(0,0,0,0);
 	}
 	onInit();
 	if ( m_flags & MB_DISPLAY_IMMEDIATELY)
 	{
-		m_world->lock();
+		lock();
 
 		onInit();
 		onClearScreen();
 		onPaintButtons();
 		onPaint();
-		if (m_render_after_paint)
-		{
-			onRender();
-		}
 		onDisplay();
 
-		m_world->unlock();
+		unlock();
 	}
 	if ( !(m_flags & (MB_SELF_DESTRUCT | MB_RETURN_IMMEDIATELY)))
 	{
 		onExecute( NULL);
 	}
-	m_world->lock();
-	//m_in_main_thread =false;
+	lock();
 	m_running =true;
-	m_world->unlock();
+	unlock();
 }
 
 /** @brief Construct a message box
@@ -361,33 +367,66 @@ CmessageBox::CmessageBox( const std::string &name, int x, int y, int w, int h,
  */
 CmessageBox::CmessageBox(  const std::string &name, int x, int y, int w, int h, textId id, int FLAGS) :
 			Cdialog( NULL, name, Crect(x, y, w, h))
-, m_ok( this, Crect( 0,0,Cgraphics::m_defaults.button_height+2,Cgraphics::m_defaults.button_height), KEY_CR, Cgraphics::m_defaults.icon_ok48)
-, m_cancel( this, Crect( 0,0, BTN_WIDTH,BTN_HEIGHT), KEY_CANCEL, Cgraphics::m_defaults.icon_cancel48)
+, m_factor( (FLAGS&MB_BIG_BUTTONS) ? 2:1)
+, m_ok( std::make_shared<Cimage>( this, Crect( 0,0,m_factor*Cgraphics::m_defaults.button_height+2,m_factor*Cgraphics::m_defaults.button_height), KEY_CR, Cgraphics::m_defaults.icon_ok48))
+, m_cancel( std::make_shared<Cimage>( this, Crect( 0,0, m_factor*BTN_WIDTH,m_factor*BTN_HEIGHT), KEY_CANCEL, Cgraphics::m_defaults.icon_cancel48))
+, m_language( std::make_shared<Cimage>( this, Crect( 0,0, BTN_WIDTH*m_factor,BTN_HEIGHT*m_factor), KEY_SPACE, Cgraphics::m_defaults.icon_language48))
+, m_key(KEY_0)
+, m_lastKey(KEY_0)
 {
-	m_text =Cgraphics::m_defaults.get_translation( id, Cgraphics::m_defaults.country);
+	m_text = getTranslation( id, Cgraphics::m_defaults.country);
 	setFlags(FLAGS);
-	registerMessageBox();
+	registerMessageBx();
 	if ( m_flags & MB_DARKEN)
 	{
-		graphics()->darken( 0,0, Cgraphics::m_defaults.width, Cgraphics::m_defaults.height);
+		m_mainGraph->darken( 0,0, Cgraphics::m_defaults.width, Cgraphics::m_defaults.height);
 	}
 	onInit();
 
 	if ( m_flags & MB_DISPLAY_IMMEDIATELY)
 	{
-		m_world->lock();
-
 		onInit();
 		onClearScreen();
 		onPaintButtons();
 		onPaint();
-		if (m_render_after_paint)
-		{
-			onRender();
-		}
 		onDisplay();
+	}
 
-		m_world->unlock();
+	if ( !(m_flags & MB_RETURN_IMMEDIATELY))
+	{
+		onExecute( NULL);
+	}
+	//m_in_main_thread =false;
+	m_running =true;
+}
+
+/** @brief Construct a message box
+ *  @param name [in] name of dialog
+ *  @param xx [in] Position and size dialog
+ *  @param id [in] Text id for top string
+ *  @param FLAGS [in] All floags for message box
+ */
+CmessageBox::CmessageBox( const std::string &name, const Crect &xx, const std::string &title, int FLAGS)
+: Cdialog( NULL, name, xx)
+, m_text(title)
+, m_factor( (FLAGS&MB_BIG_BUTTONS) ? 2:1)
+, m_ok( std::make_shared<Cimage>(this, Crect( 0,0, BTN_WIDTH*m_factor,BTN_HEIGHT*m_factor), KEY_CR, Cgraphics::m_defaults.icon_ok48))
+, m_cancel( std::make_shared<Cimage>(this, Crect( 0,0, BTN_WIDTH*m_factor,BTN_HEIGHT*m_factor), KEY_CANCEL, Cgraphics::m_defaults.icon_cancel48))
+, m_language( std::make_shared<Cimage>(this, Crect( 0,0, BTN_WIDTH*m_factor,BTN_HEIGHT*m_factor), KEY_SPACE, Cgraphics::m_defaults.icon_language48))
+{
+	setFlags(FLAGS);
+	registerMessageBx();
+	if ( m_flags & MB_DARKEN)
+	{
+		m_graphics->darken( 0,0,0,0);
+	}
+	if ( m_flags & MB_DISPLAY_IMMEDIATELY)
+	{
+		onInit();
+		onClearScreen();
+		onPaintButtons();
+		onPaint();
+		onDisplay();
 	}
 
 	if ( !(m_flags & MB_RETURN_IMMEDIATELY))
@@ -406,32 +445,30 @@ CmessageBox::CmessageBox(  const std::string &name, int x, int y, int w, int h, 
  */
 CmessageBox::CmessageBox( const std::string &name, const Crect &xx, textId id, int FLAGS)
 : Cdialog( NULL, name, xx)
-, m_ok( this, Crect( 0,0, BTN_WIDTH,BTN_HEIGHT), KEY_CR, Cgraphics::m_defaults.icon_ok48)
-, m_cancel( this, Crect( 0,0, BTN_WIDTH,BTN_HEIGHT), KEY_CANCEL, Cgraphics::m_defaults.icon_cancel48)
+, m_factor( (FLAGS&MB_BIG_BUTTONS) ? 2:1)
+, m_ok( std::make_shared<Cimage>(this, Crect( 0,0, BTN_WIDTH*m_factor,BTN_HEIGHT*m_factor), KEY_CR, Cgraphics::m_defaults.icon_ok48))
+, m_cancel( std::make_shared<Cimage>(this, Crect( 0,0, BTN_WIDTH*m_factor,BTN_HEIGHT*m_factor), KEY_CANCEL, Cgraphics::m_defaults.icon_cancel48))
+, m_language( std::make_shared<Cimage>(this, Crect( 0,0, BTN_WIDTH*m_factor,BTN_HEIGHT*m_factor), KEY_SPACE, Cgraphics::m_defaults.icon_language48))
 {
-	m_text =Cgraphics::m_defaults.get_translation( id, Cgraphics::m_defaults.country);
+	m_text = getTranslation( id, Cgraphics::m_defaults.country);
 	setFlags(FLAGS);
-	registerMessageBox();
-	if ( m_flags & MB_DARKEN)
+	registerMessageBx();
+	if (FLAGS & MB_DARKEN)
 	{
 		m_graphics->darken( 0,0,0,0);
 	}
-	if ( m_flags & MB_DISPLAY_IMMEDIATELY)
+	if (FLAGS & MB_DISPLAY_IMMEDIATELY)
 	{
-		m_world->lock();
+		lock();
 		onInit();
 		onClearScreen();
 		onPaintButtons();
 		onPaint();
-		if (m_render_after_paint)
-		{
-			onRender();
-		}
 		onDisplay();
-		m_world->unlock();
+		unlock();
 	}
 
-	if ( !(m_flags & MB_RETURN_IMMEDIATELY))
+	if ( !(FLAGS & MB_RETURN_IMMEDIATELY))
 	{
 		onExecute( NULL);
 	}
@@ -448,42 +485,36 @@ keybutton CmessageBox::key()
 
 CmessageBox::CmessageBox( const std::string &name) :
 			Cdialog( NULL, name, Crect(56, 4, 20, 8))
-, m_ok( this, Crect( 0,0, BTN_WIDTH,BTN_HEIGHT), KEY_CR, Cgraphics::m_defaults.icon_ok48)
-, m_cancel( this, Crect( 0,0, BTN_WIDTH,BTN_HEIGHT), KEY_CANCEL, Cgraphics::m_defaults.icon_cancel48)
+, m_factor(1)
+, m_ok( std::make_shared<Cimage>( this, Crect( 0,0, BTN_WIDTH,BTN_HEIGHT), KEY_CR, Cgraphics::m_defaults.icon_ok48))
+, m_cancel( std::make_shared<Cimage>( this, Crect( 0,0, BTN_WIDTH*m_factor, BTN_HEIGHT*m_factor), KEY_CANCEL, Cgraphics::m_defaults.icon_cancel48))
+, m_language( std::make_shared<Cimage>( this, Crect( 0,0, BTN_WIDTH*m_factor, BTN_HEIGHT*m_factor), KEY_SPACE, Cgraphics::m_defaults.icon_language48))
 {
-	// TODO Auto-generated constructor stub
-	//pushScreen();
-	registerMessageBox();
+	registerMessageBx();
 
 	if ( m_flags & MB_DISPLAY_IMMEDIATELY)
 	{
-		m_world->lock(); // Dialog list should not change.
+		lock(); // Dialog list should not change.
 		onInit();
 		CdialogEvent::Instance()->lock();
 
 		onClearScreen();
 		onPaintButtons();
 		onPaint();
-		if (m_render_after_paint)
-		{
-			onRender();
-		}
 		onDisplay();
 
 		CdialogEvent::Instance()->unlock();
-		m_world->unlock();
+		unlock();
 	}
 }
 
 CmessageBox::~CmessageBox()
 {
-	//("begin CmessageBox::~CmessageBox %s", m_name.c_str() );
 	if ( m_push ==true)
 	{
-		m_world->unregisterMessageBox(this);
+		unregisterMessageBox(this);
 		m_push =false;
 	}
-	//("end CmessageBox::~CmessageBox");
 }
 
 /** @brief Init the message box
@@ -492,29 +523,37 @@ CmessageBox::~CmessageBox()
 bool CmessageBox::onInit()
 {
 	int x=m_rect.right()-Cgraphics::m_defaults.button_height*2-2;
-	int y=m_rect.bottom()-Cgraphics::m_defaults.button_height-1;
+	int y=m_rect.bottom()-Cgraphics::m_defaults.button_height*m_factor-1;
 
 	switch ( m_flags & MB_STYLE)
 	{
 	case MB_OK:
-		m_ok.m_rect.setPosition( Cpoint(x,y));
-		m_graphics->setCode( m_ok.m_rect.offset(0,0,Cgraphics::m_defaults.button_height*2+1,Cgraphics::m_defaults.button_height), KEY_CR);
-		x=x-Cgraphics::m_defaults.button_height*2-1;
+		m_ok->m_rect.setPosition( Cpoint(x,y));
+		m_graphics->setKey( m_ok->m_rect.offset(0,0,Cgraphics::m_defaults.button_height*2+1,Cgraphics::m_defaults.button_height), KEY_CR);
 		break;
 
 	case MB_QUIT_OK:
-		m_ok.m_rect.setPosition( Cpoint(x,y));
-		m_graphics->setCode( m_ok.m_rect.offset(0,0,Cgraphics::m_defaults.button_height*2+1,Cgraphics::m_defaults.button_height), KEY_CR);
-		x=x-2*Cgraphics::m_defaults.button_height-1;
-		m_cancel.m_rect.setPosition( Cpoint(x,y));
-		m_graphics->setCode( m_ok.m_rect.offset(0,0,Cgraphics::m_defaults.button_height*2+1,Cgraphics::m_defaults.button_height), KEY_ESCAPE);
-		x=x-Cgraphics::m_defaults.button_height*2-1;
+		m_ok->m_rect.setPosition( Cpoint(x,y));
+		m_graphics->setKey( m_ok->m_rect.offset(0,0,Cgraphics::m_defaults.button_height*2+1,Cgraphics::m_defaults.button_height), KEY_CR);
+		x-=2*Cgraphics::m_defaults.button_height-1;
+		m_cancel->m_rect.setPosition( Cpoint(x,y));
+		m_graphics->setKey( m_ok->m_rect.offset(0,0,Cgraphics::m_defaults.button_height*2+1,Cgraphics::m_defaults.button_height), KEY_ESCAPE);
+		break;
+
+	case MB_QUIT_OK_LANG:
+		m_ok->m_rect.setPosition( Cpoint(x,y));
+		m_graphics->setKey( m_ok->m_rect.offset(0,0,Cgraphics::m_defaults.button_height*2+1,Cgraphics::m_defaults.button_height), KEY_CR);
+		x-=2*Cgraphics::m_defaults.button_height-1;
+		m_cancel->m_rect.setPosition( Cpoint(x,y));
+		m_graphics->setKey( m_ok->m_rect.offset(0,0,Cgraphics::m_defaults.button_height*2+1,Cgraphics::m_defaults.button_height), KEY_ESCAPE);
+		x-=2*Cgraphics::m_defaults.button_height-1;
+		m_language->m_rect.setPosition( Cpoint(x,y));
+		m_graphics->setKey( m_language->m_rect.offset(0,0,Cgraphics::m_defaults.button_height*2+1,Cgraphics::m_defaults.button_height), KEY_LANG);
 		break;
 
 	case MB_QUIT:
-		m_cancel.m_rect.setPosition( Cpoint(x,y));
-		m_graphics->setCode( m_ok.m_rect.offset(0,0,Cgraphics::m_defaults.button_height*2+1,Cgraphics::m_defaults.button_height), KEY_ESCAPE);
-		x=x-Cgraphics::m_defaults.button_height*2-1;
+		m_cancel->m_rect.setPosition( Cpoint(x,y));
+		m_graphics->setKey( m_ok->m_rect.offset(0,0,Cgraphics::m_defaults.button_height*2+1,Cgraphics::m_defaults.button_height), KEY_ESCAPE);
 		break;
 	}
 	return true;
@@ -535,13 +574,30 @@ void CmessageBox::onUpdate()
  */
 void CmessageBox::onClearScreen()
 {
-	graphics()->darken( 8*(m_rect.left()+2), 8*(m_rect.top()+2),
+	m_mainGraph->darken( 8*(m_rect.left()+2), 8*(m_rect.top()+2),
 			             8*m_rect.width(), 8*m_rect.height());
     Cbackground( NULL, m_rect, KEY_NONE, Cgraphics::m_defaults.messagebox_background2,
     		     0, FILL_GRADIENT, Cgraphics::m_defaults.messagebox_background1).onPaint(0);
     Egravity gravity =(m_flags&MB_TEXT_CENTER) ? GRAVITY_CENTER:GRAVITY_LEFT;
-    Ctext( this, m_rect, KEY_NONE, (Sfont)CtextFont("msb_box"), m_text,
-    		Cgraphics::m_defaults.messagebox_text, gravity).onPaint(0);
+    if (m_flags&MB_TEXT_CENTER_TOP)
+    {
+    	gravity =GRAVITY_TOP_CENTER;
+    }
+    Crect textRect =m_rect;
+    int hh = textRect.height();
+    if (hh>BTN_HEIGHT && ((m_flags&MB_QUIT_OK)!=0))
+    {
+    	textRect.setHeight( hh-BTN_HEIGHT);
+    }
+    try
+    {
+    	Ctext( this, textRect, KEY_NONE, (Sfont)CtextFont("msb_box"), m_text,
+    			Cgraphics::m_defaults.messagebox_text,
+				gravity).onPaint(0);
+    }
+    catch(...)
+    {
+    }
 }
 
 /*============================================================================*/
@@ -556,41 +612,18 @@ void CmessageBox::onClearScreen()
 void CmessageBox::onPaint()
 {
 	int btn1 =Cgraphics::m_defaults.button_height;
-    //int big =(m_flags & MB_BIG ) ? BIG:0;
 	if ( m_flags & MB_PRINTER_READY)
 	{
-		graphics()->image( Cgraphics::m_defaults.icon_printer48,
+		m_mainGraph->image( Cgraphics::m_defaults.icon_printer48,
 				 m_rect.left()*8, m_rect.top()*8, (m_rect.left()+btn1)*8, (m_rect.top()+btn1)*8);
 		CcalculatorButton( Crect( m_rect.left()+btn1, m_rect.top(), m_rect.left()+btn1*2, m_rect.top()+btn1),
 			               "ok", KEY_NONE);
 	}
 	if ( m_flags & MB_PRINTING)
 	{
-		graphics()->image( Cgraphics::m_defaults.icon_printer48,
+		m_mainGraph->image( Cgraphics::m_defaults.icon_printer48,
 				            m_rect.left()*8, m_rect.top()*8, (m_rect.left()+btn1)*8,btn1*8);
 	}
-//	switch ( m_flags & MB_STYLE)
-//	{
-//	case MB_OK:
-//		m_graphics->setCode( m_ok.m_rect.offset(0,0,13,6), KEY_CR);
-//		m_ok.onPaint( Cpoint( m_rect.right()-1-m_ok.m_rect.width(), m_rect.bottom()-7), NO_TOUCH);
-//		break;
-//
-//	case MB_QUIT_OK:
-//		m_graphics->setCode( m_ok.m_rect.offset(0,0,13,6), KEY_CR);
-//		m_ok.m_rect.setPosition( Cpoint( m_rect.right-2-m_ok.m_rect.width(), m_rect.bottom()-7));
-//		m_cancel.m_rect.setPosition( m_ok.m_rect.m_origin-Cpoint(13,0));
-//		m_graphics->setCode( m_ok.m_rect, KEY_CR);
-//		m_graphics->setCode( m_cancel.m_rect, KEY_ESCAPE);
-//		m_ok->onPaint(0);
-//		m_cancel->onPaint(0);
-//		break;
-//
-//	case MB_QUIT:
-//		m_graphics->setCode( m_cancel.m_rect.offset(0,0,13,6), KEY_CR);
-//		m_cancel.onPaint( Cpoint( m_rect.right()-1-m_ok.m_rect.width(), m_rect.bottom()-7), 0);
-//		break;
-//	}
 }
 
 /** @brief Handle key events
@@ -598,7 +631,7 @@ void CmessageBox::onPaint()
  *  @param sym [in] The real symbol picked
  *  @return Return status, to see if the event was handled. If not it is sent to parents, brothers etc.
  */
-Estatus CmessageBox::onButton( keymode mod, keybutton sym)
+Estatus CmessageBox::onButton( SDLMod mod, keybutton sym)
 {
 	(void)mod;
 	Ctimestamp d;
@@ -672,7 +705,7 @@ void CmessageBox::onCleanup()
 {
 	if ( m_push)
 	{
-		m_world->unregisterMessageBox(this);
+		unregisterMessageBox(this);
 	}
 }
 
@@ -682,7 +715,7 @@ void CmessageBox::clear()
 	if ( m_push ==true)
 	{
 		//pollScreen();
-		m_world->unregisterMessageBox(this);
+		unregisterMessageBox(this);
 		m_push =false;
 	}
 }

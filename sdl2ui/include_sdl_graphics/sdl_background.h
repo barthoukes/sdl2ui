@@ -32,22 +32,11 @@
 #pragma once
 
 /*------------- Standard includes --------------------------------------------*/
-#include "sdl_dialog_object.h"
-#include "sdl_graphics.h"
-#include "sdl_rect.h"
+#include <memory>
 
-/// @brief  Fill pattern.
-typedef enum
-{
-	FILL_NONE, ///< No fill.
-	FILL_UNICOLOURED,	///< No fill.
-	FILL_2COLOURS, ///< Complete fill.
-	FILL_GRADIENT, ///< Fill colour 1 to 2.
-	FILL_PYRAMID, ///< First colour in middle.
-	FILL_IMAGE, ///< Fill with image.
-	FILL_CIRCULAR, ///< Fill with circular background
-	FILL_PIE ///< Fill pie with 2 parts
-} EfillType;
+#include "sdl_rect.h"
+#include "sdl_graphics.h"
+#include "sdl_dialog_object.h"
 
 // Light factors.
 #define LIGHT_HALF		-50
@@ -77,23 +66,32 @@ public:
 	}
 	virtual ~Cbackground();
 	void setBorderWidth( int width) { m_borderWidth=width; }
-	void setCode( keybutton key) { m_key=key; }
+	void setKey( keybutton key) { m_key=key; }
 	colour getColour() { return m_col1; }
 	void setCorner(int cr) { m_pieCorner =cr%360; }
+    Crect getRect() const;
 
 private:
 	colour calcColour( colour col1, colour col2, double fraction);
 
-private:
+public:
 	colour	  	m_col1;			///< Fill colour.
 	colour		m_col2;         ///< Colour 2.
+
+private:
 	EfillType 	m_pattern;		///< Pattern to fill.
 	keybutton 	m_key;			///< What key?
 	int         m_radius;       ///< Corner size.
 	std::string m_image;		///< Background for button.
-	int m_R1, m_G1, m_B1, m_R2, m_G2, m_B2;
+	int         m_R1;
+	int         m_G1;
+	int         m_B1;
+	int         m_R2;
+	int         m_G2;
+	int         m_B2;
 	int			m_pieCorner;	///< Corner pie.
 public:
 	int			m_borderWidth;  ///< To reduce the painting.
 };
 
+typedef std::shared_ptr<Cbackground> CbackgroundPtr;

@@ -1,17 +1,17 @@
 /*============================================================================*/
-/**  @file      sdl_hand_writer.h
- **  @ingroup   user_interface
- **  @brief		Chinese hand-writing library.
+/**  @file       sdl_swype_interface.h
+ **  @ingroup    zhongcan_user_interface
+ **  @brief		 Common swype interface
  **
- **  Create and show images.
+ **  Create a default swype inteface
  **
  **  @author     mensfort
  **
  **  @par Classes:
- **              ChandWriter
+ **              IswypeInterface
  */
 /*------------------------------------------------------------------------------
- ** Copyright (C) 2011, 2014, 2015
+ ** Copyright (C) 2011, 2014, 2020
  ** Houkes Horeca Applications
  **
  ** This file is part of the SDL2UI Library.  This library is free
@@ -36,38 +36,29 @@
  **===========================================================================*/
 
 #pragma once
-
 /*------------- Standard includes --------------------------------------------*/
-#include "sdl_image.h"
-#include "zinnia.h"
+#include <memory>
+#include "sdl_rect.h"
 
-/// @brief  Create and display buttons.
-class ChandWriter : public Cimage
+/// @brief Scrolling dialog with list of items.
+class IswypeInterface
 {
 public:
-	ChandWriter( Cdialog *parent, const Crect &rect, const std::string &model, int distance);
-	virtual ~ChandWriter();
-
-public:
-	void    clearImage();
-	virtual void onPaint( const Cpoint &p);
-	std::string get( size_t n);
-	void addPoint( int x, int y);
-	virtual bool onPaintingStart( const Cpoint &point);
-	virtual bool onPaintingMove( const Cpoint &point);
-	virtual bool onPaintingStop( const Cpoint &point);
-
-private:
-	int 	m_stroke; ///< Index for our stroke.
-	int 	m_distance; ///< Distance for current stroke.
-	int		m_index;	///< which sub-line inside a stroke.
-	bool 	m_started; ///< Is the mouse pressed.
-	Cpoint  m_lastPoint; ///< Last point.
-	zinnia_recognizer_t *m_recognizer;
-	zinnia_character_t 	*m_character;
-	zinnia_result_t 	*m_result;
-	char 	m_value[4];
-	int		m_minimum_distance; ///< Minimum distance between points
+	virtual ~IswypeInterface() {}
+	virtual void onPaint() =0;
+	//	virtual void setSpeed(double speed) =0;
+//    virtual size_t rows() =0;
+//    virtual void clean() =0;
+//	virtual void onCleanup();
+	virtual void onPaintUnit( int unit, const Crect &location) =0;
+	//virtual void invalidate() =0;
+//
+//	virtual Estatus onButton( SDLMod mod, keybutton sym) =0;
+	//virtual bool onLoop() =0;
 };
 
-typedef std::shared_ptr<ChandWriter> ChandWriterPtr;
+/// Shared swype dialog
+//typedef std::shared_ptr<IswypeInterface> CswypeInterfacePtr;
+
+/* SCROLL_DIALOG_H_ */
+

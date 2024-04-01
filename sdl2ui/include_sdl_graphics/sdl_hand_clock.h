@@ -1,17 +1,17 @@
 /*============================================================================*/
-/**  @file      sdl_hand_writer.h
+/**  @file      sdl_hand_clock.h
  **  @ingroup   user_interface
- **  @brief		Chinese hand-writing library.
+ **  @brief		hand-clock library.
  **
- **  Create and show images.
+ **  Create timestamp.
  **
  **  @author     mensfort
  **
  **  @par Classes:
- **              ChandWriter
+ **              ChandClock
  */
 /*------------------------------------------------------------------------------
- ** Copyright (C) 2011, 2014, 2015
+ ** Copyright (C) 2011, 2014, 2018
  ** Houkes Horeca Applications
  **
  ** This file is part of the SDL2UI Library.  This library is free
@@ -38,36 +38,73 @@
 #pragma once
 
 /*------------- Standard includes --------------------------------------------*/
-#include "sdl_image.h"
-#include "zinnia.h"
+#include <vector>
+#include <memory>
+#include "sdl_fast_arc.h"
+#include "sdl_types.h"
+#include "sdl_text.h"
+
+typedef enum
+{
+	CLOCK_STATE_NONE,
+	CLOCK_STATE_AMPM,
+	CLOCK_STATE_HOURS,
+	CLOCK_STATE_MINUTES
+} EclockState;
 
 /// @brief  Create and display buttons.
-class ChandWriter : public Cimage
+class ChandClock : public CdialogObject
 {
 public:
-	ChandWriter( Cdialog *parent, const Crect &rect, const std::string &model, int distance);
-	virtual ~ChandWriter();
+	ChandClock( Cdialog *parent, const Crect &rect,
+			colour hourColour, colour minutesColour, colour fingerColour,
+			const Sfont &font, colour textColour);
+	virtual ~ChandClock();
 
 public:
 	void    clearImage();
-	virtual void onPaint( const Cpoint &p);
+	virtual void onPaint( int touch);
 	std::string get( size_t n);
 	void addPoint( int x, int y);
 	virtual bool onPaintingStart( const Cpoint &point);
 	virtual bool onPaintingMove( const Cpoint &point);
 	virtual bool onPaintingStop( const Cpoint &point);
+	void setTime(int hours, int minutes);
+	bool isChanged();
+	void setResolution(int res);
+	void setCenter( const Cpoint &center);
+	int getDayMinutes() const;
+    int getHours() const;
+    int getMinutes() const;
 
 private:
+    int     m_hours;
+    int     m_minutes;
+	EclockState m_state; ///< What r we doing?
+	int     m_startHour;
+	int     m_startMinute;
+	colour 	m_hourColour[3];
+	colour  m_minutesColour[3];
 	int 	m_stroke; ///< Index for our stroke.
 	int 	m_distance; ///< Distance for current stroke.
-	int		m_index;	///< which sub-line inside a stroke.
 	bool 	m_started; ///< Is the mouse pressed.
 	Cpoint  m_lastPoint; ///< Last point.
-	zinnia_recognizer_t *m_recognizer;
-	zinnia_character_t 	*m_character;
-	zinnia_result_t 	*m_result;
 	char 	m_value[4];
-	int		m_minimum_distance; ///< Minimum distance between points
+	colour	m_textColour; ///< Colour text.
+	Ctext	m_textButton; ///< Text button to use.
+	Cpoint	m_hourPoint;
+	Cpoint	m_minutesPoint;
+	int		h_center;
+	int		v_center;
+	int		m_resolution;
+	int   	m_radius0;
+	int   	m_radius1;
+	int   	m_radius2;
+	CfastArc	m_minutesArc;
+	CfastArc	m_hoursArc;
+	CfastArc	m_fingerArc;
+	CfastArc	m_amPmArc;
+	bool 	m_isAm;
 };
 
-typedef std::shared_ptr<ChandWriter> ChandWriterPtr;
+typedef std::shared_ptr<ChandClock> ChandClockPtr;

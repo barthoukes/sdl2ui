@@ -38,8 +38,10 @@
 #pragma once
 
 /*------------- Standard includes --------------------------------------------*/
+#include <memory>
 
 class CdialogObject;
+typedef std::shared_ptr<CdialogObject> CdialogObjectPtr;
 
 #include "sdl_rect.h"
 
@@ -50,28 +52,29 @@ public:
 	CdragObject();
 	virtual ~CdragObject();
 	void 	clean();
-	CdragObject & operator =(CdialogObject* object);
+	CdragObject & operator =(CdialogObjectPtr object);
 	bool isEmpty() { return !m_dragObject; }
-	void setObject( CdialogObject *object, Cpoint offset, Cpoint start);
+	void setObject( CdialogObjectPtr object, Cpoint offset, Cpoint start);
 	void onPaint();
 	Cpoint dragTo( const Cpoint &finger);
 	bool moveTo( const Cpoint &finger);
 	Cpoint getDragPoint() { return m_dragPoint; }
-	bool start( const Cpoint &finger, CdialogObject *object);
+	bool start( const Cpoint &finger, CdialogObjectPtr object);
 	bool stop( const Cpoint &finger);
 	Cpoint getTopLeft( const Cpoint mouse);
 
 public:
-	CdialogObject		*m_dragObject;		///< object to drag.
+	CdialogObjectPtr	m_dragObject;		///< object to drag.
 private:
 	Cpoint 				m_dragStart;		///< Where to start dragging
 	Cpoint				m_dragOffset;		///< Drag offset in 800x600 res.
 	Cpoint              m_dragPoint;		///< Where to drag now
-	//Cdialog				*m_parent;			///< Parent dialog
 };
 
+typedef std::shared_ptr<CdragObject> CdragObjectPtr;
 
-#ifdef USE_SDL2222
+#if 0
+#ifdef USE_SDL2
 
 #include "sdl_rect.h"
 #include "SDL_rect.h"
@@ -87,7 +90,7 @@ public:
 	CdragObject();
 	virtual ~CdragObject();
 
-	void dragStart( CdialogObject *object, const Cpoint &origin);
+	void dragStart( CdialogObjectPtr object, const Cpoint &origin);
 	void clear();
 	void dragMove( const Cpoint &position);
 	void dragEnd( const Cpoint &position);
@@ -97,7 +100,7 @@ public:
 	Cpoint dragPoint( const Csize &graph, const Cpoint &mouse);
 
 private:
-	CdialogObject 	*m_relatedObject;	///< Relation to an object
+	CdialogObjectPtr m_relatedObject;	///< Relation to an object
 	//SDL_Texture		*m_relatedTexture;  ///< Texture relation
 	bool			m_visible;			///< Is the item visible
 	Cpoint			m_origin; 			///< Position to start from
@@ -107,6 +110,7 @@ private:
 	Cpoint			m_dragOffset;		///< Point within area we touched
 	Cpoint			m_dragStart;		///< start of drag object.
 };
+#endif
 
 #endif
 /* END SDL_DRAG_OBJECT_H_ */

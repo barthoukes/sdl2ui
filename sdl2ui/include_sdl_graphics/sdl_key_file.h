@@ -38,13 +38,9 @@
 #pragma once
 
 /*------------- Standard includes --------------------------------------------*/
-#include <sdl_keybutton.h>
 #include <stdio.h>
-#ifdef USE_SDL2
-#include "SDL_events.h"
-#else
-#include "SDL_events.h"
-#endif
+#include <sdl_keybutton.h>
+#include <string>
 
 class Cevent;
 
@@ -65,5 +61,6 @@ public:
 
 private:
 	bool m_mouseDown; ///< If no mouse pressed, then forget mouse move events.
+    std::string m_path;
 };
 

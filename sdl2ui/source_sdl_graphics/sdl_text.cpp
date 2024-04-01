@@ -36,6 +36,7 @@
  **===========================================================================*/
 
 /*------------- Standard includes --------------------------------------------*/
+#include "lingual.h"
 #include "sdl_text.h"
 #include "sdl_dialog.h"
 #include "sdl_surface.h"
@@ -57,7 +58,7 @@ Ctext::Ctext( Cdialog *parent,
 		      const Sfont &font,
 		      const std::string &value,
 		      colour text,
-		      Egravity align,
+			  Egravity align,
 		      int cursor,
 		      int background)
 : CdialogObject( parent, rect, code)
@@ -74,7 +75,10 @@ Ctext::Ctext( Cdialog *parent,
 , m_cursor(cursor)
 , m_cursorColour(background)
 , m_rotate(false)
+, m_doesNotFit(false)
+, m_isChineseText(false)
 {
+	m_canDecreaseFont = Cgraphics::m_defaults.resize_font;
 }
 
 /** @brief Constructor
@@ -107,7 +111,10 @@ Ctext::Ctext( Cdialog *parent,
 , m_cursor(-1)
 , m_cursorColour(0)
 , m_rotate( false)
+, m_doesNotFit(false)
+, m_isChineseText(false)
 {
+	m_canDecreaseFont = Cgraphics::m_defaults.resize_font;
 }
 
 /** @brief Destructor */
@@ -127,12 +134,12 @@ void Ctext::onPaint( int touch)
 	std::string text;
 	if ( m_useTextId)
 	{
-		text =Cgraphics::m_defaults.get_translation( m_textId, Cgraphics::m_defaults.country);
-		onPaint( text, touch);
+		text = getTranslation( m_textId, Cgraphics::m_defaults.country);
+		onPaintText( text, touch);
 	}
 	else
 	{
-		onPaint( m_value, touch);
+		onPaintText( m_value, touch);
 	}
 }
 
@@ -143,35 +150,86 @@ void Ctext::onPaint( int touch)
 /// @brief text [in] Alternative text.
 ///
 /*============================================================================*/
-void Ctext::onPaint( const std::string &text, int touch)
+void Ctext::onPaintText( const std::string &text, int touch)
 {
 	(void)touch;
 	utf8string zs(text); // Conversion old format.
 	std::string t(zs);
-	TTF_Font *f=m_font.local.font;
+    m_doesNotFit = false;
+    m_isChineseText = false;
+
+	// Check for chinese characters in the text.
 	for ( int a=0; a<(int)zs.size(); a++)
 	{
-		if ( zs[a]>16384) // && zs[a]!=0x20ac)
+		if ( zs[a]>255) // && zs[a]!=0x20ac)
 		{
-			f=m_font.chinese.font;
+			m_isChineseText = true;
 			break;
 		}
 	}
-	if (!f)
+
+	while(1)
 	{
-		return;
+		TTF_Font *font = m_isChineseText ? m_font.chinese.font:m_font.local.font;
+		if (!font)
+		{
+			return; // No font found.
+		}
+
+		TTF_SetFontStyle( font, m_style);
+		Crect rect( m_rect*8);
+		rect = Crect( rect.left()+m_horizontal_margin, rect.top()+m_vertical_margin,
+					  rect.width()-2*m_horizontal_margin, rect.height()-2*m_vertical_margin);
+		if ( m_shadow)
+		{
+			Crect rectp=rect;
+			rectp.addLeft(1); rectp.addTop(1);
+			CtextSurface surface1( m_pGraphics, t, rectp, m_cursor, m_gravity,
+								   m_shadow, m_cursorColour, font, m_canDecreaseFont);
+			m_doesNotFit = surface1.doesNotFit();
+			if (surface1.doesNotFit())
+			{
+				return;
+			}
+		}
+		CtextSurface surface2( m_pGraphics, t, rect, m_cursor, m_gravity, m_colour,
+							   m_cursorColour, font, m_canDecreaseFont);
+		m_doesNotFit = surface2.doesNotFit();
+
+		if (!m_doesNotFit)
+		{
+			break;
+		}
+		decreaseFont();
 	}
-	TTF_SetFontStyle( f, m_style);
-	Crect rect( m_rect*8);
-	rect =Crect( rect.left()+m_horizontal_margin, rect.top()+m_vertical_margin,
-			     rect.width()-2*m_horizontal_margin, rect.height()-2*m_vertical_margin);
-	if ( m_shadow)
+}
+
+void Ctext::decreaseFont()
+{
+	if (m_isChineseText)
 	{
-		Crect rectp=rect;
-		rectp.addLeft(1); rectp.addTop(1);
-		CtextSurface surface1( m_graphics, t, rectp, m_cursor, m_gravity, m_shadow, m_cursorColour, f);
+		if ( m_font.chinese.fontSize >12)
+		{
+			m_font.chinese = CtextFont::findFont(m_font.chinese.fontName,
+					                             m_font.chinese.fontSize-2);
+		}
+		else
+		{
+			m_canDecreaseFont = RESIZE_OFF;
+		}
 	}
-	CtextSurface surface2( m_graphics, t, rect, m_cursor, m_gravity, m_colour, m_cursorColour, f);
+	else
+	{
+		if ( m_font.local.fontSize >8)
+		{
+			m_font.local = CtextFont::findFont(m_font.local.fontName,
+					                           m_font.local.fontSize-1);
+		}
+		else
+		{
+			m_canDecreaseFont = RESIZE_OFF;
+		}
+	}
 }
 
 /*============================================================================*/
@@ -225,4 +283,16 @@ bool Ctext::empty()
 {
 	if ( m_useTextId) { return (m_textId ==INVALID_TEXT_ID); }
 	return m_value.empty();
+}
+
+/*----------------------------------------------------------------------------*/
+void Ctext::move( int x, int y)
+{
+    m_rect.move(x,y);
+}
+
+/*----------------------------------------------------------------------------*/
+void Ctext::decrease( int w, int h)
+{
+    m_rect.decrease(w,h);
 }

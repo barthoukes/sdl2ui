@@ -36,7 +36,6 @@
  **===========================================================================*/
 
 /*------------- Standard includes --------------------------------------------*/
-#include "assert.h"
 #include "sdl_scroll_text.h"
 #include "sdl_dialog.h"
 #include "sdl_surface.h"
@@ -67,8 +66,12 @@ CscrollText::CscrollText( Cdialog *parent,
 , m_horizontal_margin(0)
 , m_vertical_margin(0)
 , m_shadow(0)
+, m_rotate(false)
+, m_speed(0)
+, m_scroll(0)
 , m_surface( value, m_font.chinese.font, Csize(10000, rect.height()*8), GRAVITY_LEFT_CENTER)
 {
+    (void)background;
 }
 
 /** @brief Destructor */
@@ -98,6 +101,7 @@ void CscrollText::onPaint( int touch)
 /*============================================================================*/
 void CscrollText::onPaint( const std::string &text, int touch)
 {
+    (void)touch;
 	utf8string zs(text); // Conversion old format.
 	std::string t(zs);
 	TTF_Font *f=m_font.local.font;
@@ -132,12 +136,10 @@ void CscrollText::onPaint( const std::string &text, int touch)
 	if ( (int)m_scroll<w)
 	{
 		Crect dst( x+w+1-(int)m_scroll,y+1, (int)m_scroll,h );
-		assert(0); // to be implemented
-		//m_graphics->copySurface( m_surface.first(), dst, src);
+		m_pGraphics->copySurface( m_surface.first(), dst, src);
 	}
 	Crect dst2( x+w-(int)m_scroll,y, (int)m_scroll,h );
-	assert(0); // to be implemented
-	//m_graphics->copySurface( m_surface.first(), dst2, src);
+	m_pGraphics->copySurface( m_surface.first(), dst2, src);
 }
 
 /*============================================================================*/

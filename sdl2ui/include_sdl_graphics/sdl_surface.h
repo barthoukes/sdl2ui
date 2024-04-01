@@ -45,22 +45,23 @@
 #include "SDL_ttf.h"
 #include <string>
 #include <vector>
-#include "text_splitter.h"
-#include "my_thread.h"
+#include "text_splitter.hpp"
+#include "my_thread.hpp"
 
 /// @brief Create a text surface for printing, display etc.
 class CtextSurface
 {
 public:
 	// For screen
-	CtextSurface( std::shared_ptr<Cgraphics>,
+	CtextSurface( Cgraphics *graphics,
 			      const std::string &text,
 			      const Crect &rect,
 			      int cursor,
 			      Egravity gravity,
 			      colour textColour,
 			      colour cursorColour,
-			      TTF_Font *font);
+			      TTF_Font *font,
+				  bool renderIfFit);
 
 	// For printer
 	CtextSurface( const std::string &text,
@@ -70,7 +71,7 @@ public:
 
 	virtual ~CtextSurface();
 	int width() { return m_graphics ? m_graphics->width():0; }
-	std::shared_ptr<Cgraphics> graphics() { return m_graphics; }
+	Cgraphics *graphics() { return m_graphics; }
 	static void line( SDL_Surface *surface, const Cpoint &from, const Cpoint &to);
 	static void pixel( SDL_Surface *surface, const Cpoint &pixel);
 
@@ -78,15 +79,17 @@ private:
 	void setColour( colour text, colour back);
 	void clean();
 	void createSurfaces( TTF_Font *font);
-	void createSurface();
 	void renderSurfaces();
 	SDL_Surface * blend( utf8string &text, SDL_Color fg, TTF_Font *font, bool split);
 	void setCursor( int cursor) { m_cursor =cursor; }
 	// For printer.
 	void calculateSize( TTF_Font *font);
 	void createGraphics();
+	bool isFit();
+
 public:
 	SDL_Surface *first();
+	bool doesNotFit() { return(!m_doesFit); }
 
 private:
 	SDL_Colour   m_textColour; ///< Font color (R,G,B)
@@ -97,12 +100,13 @@ private:
 	CtextSplitter    m_split; ///< Text split into lines.
 	Crect		 m_rect; ///< Size of graphic.
 	int			 m_vertical_spacing; ///< Spacing vertical.
-	std::shared_ptr<Cgraphics> m_graphics; ///< Graphics with reference count
+	Cgraphics	 *m_graphics;
 	int			 m_index;
 	int 		 m_cursor;
 	bool		 m_owner; ///< Should I remove the graphics in the end?
 	bool 		 m_blend;
 	static CmyLock m_lock;
+	bool         m_doesFit;
 };
 
 /* TEXT_SURFACE_H_ */

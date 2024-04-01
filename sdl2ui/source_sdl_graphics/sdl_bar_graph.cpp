@@ -65,6 +65,9 @@ CbarGraph::CbarGraph( Cdialog *parent, double value1, double value2, bool stacke
 , m_text( text)
 , m_textHeight( 12)
 , m_helpLines( helplines)
+, m_left(0)
+, m_right(0)
+, m_showValue(true)
 {
 	m_value.push_back( value1);
 	m_value.push_back( value2);
@@ -95,6 +98,9 @@ CbarGraph::CbarGraph( Cdialog *parent, double value1, bool stacked,
 , m_text( text)
 , m_textHeight( 12)
 , m_helpLines( helplines)
+, m_left(0)
+, m_right(0)
+, m_showValue(true)
 {
 	m_value.push_back( value1);
 	m_colour.push_back( m_defaultColour[0]);
@@ -111,6 +117,42 @@ CbarGraph::~CbarGraph()
 	// TODO Auto-generated destructor stub
 }
 
+void CbarGraph::paintHelpLines()
+{
+	int top =m_rect.top()*8;
+	int bottom =(m_rect.bottom()-m_textHeight)*8;
+
+	m_pGraphics->setColour( m_background);
+	m_pGraphics->bar( m_left, top, m_right, static_cast<int>(bottom), 0);
+
+	int c=m_helpLines;
+	m_pGraphics->setColour(c);
+	m_helpLines = 1;
+	for ( int n=1; n<m_helpLines; n++)
+	{
+		int y=(int)((bottom-top)*n/m_helpLines);
+		for ( int x=m_left; x<m_right; x+=8)
+		{
+			m_pGraphics->line( x,y, x+3, y);
+		}
+	}
+}
+
+void CbarGraph::addSpacing()
+{
+	// Add spacing
+	int spacingLeft =(int)((m_spacing+1)/2);
+	int spacingRight =(int)(m_spacing/2);
+	if ( spacingLeft)
+	{
+		m_left +=spacingLeft;
+	}
+	if ( spacingRight)
+	{
+		m_right -=spacingRight;
+	}
+}
+
 /*============================================================================*/
 ///
 ///  @brief 	Paint the dialog once. Use invalidate() to re-paint soon.
@@ -122,123 +164,74 @@ CbarGraph::~CbarGraph()
 /*============================================================================*/
 void CbarGraph::onPaint( const Crect &rect, int touch)
 {
-	double y1;
-	double y2;
 	m_rect =rect;
+	m_left =m_rect.left()*8;
+	m_right =m_rect.right()*8;
+
 	if ( !m_visible)
 	{
 		return;
 	}
 
-	double bottom =(m_rect.bottom()-m_textHeight)*8;
-	int left =m_rect.left()*8;
-	int right =m_rect.right()*8;
-	int top =m_rect.top()*8;
-
 	/// Display background + helpLines
-	m_graphics->setColour( m_background);
-	m_graphics->bar( left, top, right, static_cast<int>(bottom), 0);
-	int c=m_helpLines;
-	m_graphics->setColour(c);
-	for ( int n=1; n<m_helpLines; n++)
-	{
-		int y=(int)((bottom-top)*n/m_helpLines);
-		for ( int x=left; x<right; x+=8)
-		{
-			m_graphics->line( x,y, x+3, y);
-		}
-	}
-	double height =(bottom-top)/(m_maximum-m_minimum);
+	addSpacing();
+	paintHelpLines();
+
+	int top =m_rect.top()*8;
+	double bottom =(m_rect.bottom()-m_textHeight)*8;
+	double scale =(bottom-top)/(m_maximum-m_minimum);
 
 	// Add text
-	CgraphButton v( m_parent, Crect( rect.left(), rect.bottom()-m_textHeight, rect.width(), m_textHeight), m_text, m_rotate);
+	CgraphButton v( m_pParent, Crect( rect.left(), rect.bottom()-m_textHeight, rect.width(), m_textHeight), m_text, m_rotate);
+	if (m_font.length())
+	{
+		v.setFont(CtextFont(m_font.c_str()));
+	}
 	v.setBackgroundColour( m_background);
 	v.onPaint( touch);
 
-	// Add spacing
-	int spacingLeft =(int)((m_spacing+1)/2);
-	int spacingRight =(int)(m_spacing/2);
-	if ( spacingLeft)
-	{
-		//m_graphics->setColour( m_background);
-		//m_graphics->bar( left, top, left+spacingLeft, (int)bottom, 0);
-		left +=spacingLeft;
-		if ( spacingRight)
-		{
-			right -=spacingRight;
-		}
-	}
-	y1 =static_cast<int>(bottom);
-	y2 =y1;
+	double yTop = top;
+	double yBottom = static_cast<int>(bottom);; // bottom to paint; // top to paint
 
-	if ( m_stacked)
-	{
-		// Bars on top of each other.
-		for ( int i=0; i<(int)m_value.size(); i++)
-		{
-			double v=m_value[i];
-			colour c=m_colour[i];
-			if (v<0.01)
-			{
-				continue;
-			}
-			double n=v*height;
-			bottom-=n;
-			if ( bottom<0)
-			{
-				bottom=0;
-			}
-			y1=y2;
-			y2=static_cast<int>(bottom);
-			if ( (int)y2<=top)
-			{
-				m_graphics->setColour( c);
-				m_graphics->bar( left+1, top+1, right-1, (int)y2-1, 0);
-				int d=m_graphics->brighter( c, -15);
-				m_graphics->setColour( d);
-				m_graphics->rectangle( left, top, right, (int)y2, 2,0);
-			}
-			else
-			{
-				m_graphics->setColour( c);
-				m_graphics->bar( left+1, (int)y2+1, right-1, (int)y1-1, 0);
-				int d=m_graphics->brighter( c, -15);
-				m_graphics->setColour( d);
-				m_graphics->rectangle( left, (int)y2, right, (int)y1, 2,0);
-			}
-		}
-	}
-	else
-	{
-		double zero =bottom+m_minimum*height+0.5;
-		// Bars next to each other.
-		int x1=0,x2=left;
-		for ( int i=0; i<(int)m_value.size(); i++)
-		{
-			x1=x2;
-			x2 =left+(i+1)*(right-left)/m_value.size();
-			double v=m_value[i];
-			if (v==0)
-			{
-				continue;
-			}
-			v-=m_minimum;
-			colour c=m_colour[i];
-			double n=v*height;
-			y1 =zero-n;
-			if ( y1<0) y1=0;
-			if ( y1>bottom) y1=bottom;
+	int x1 =m_left;
+	int x2 =m_right;
 
-			if ( v!=0)
+	for (int i=0; i<(int)m_value.size(); i++)
+	{
+		if (!m_stacked)
+		{
+			x1= m_left+(i)*(m_right-m_left)/m_value.size();
+			x2 =m_left+(i+1)*(m_right-m_left)/m_value.size();
+		}
+		double heightNow =(m_value[i]-m_minimum)*scale;
+
+		heightNow =gLimit(heightNow, 0, yBottom-yTop);
+		colour c = m_colour[i];
+		if (heightNow>2)
+		{
+			m_pGraphics->setColour( c);
+			m_pGraphics->bar( x1+1, yBottom-heightNow+1, x2-1, (int)yBottom-1, 0);
+		}
+		if (heightNow>=1)
+		{
+			int d=m_pGraphics->brighter( c, -15);
+			m_pGraphics->setColour( d);
+			m_pGraphics->rectangle( x1, yBottom-heightNow, x2, (int)yBottom, 2,0);
+			if (m_stacked)
 			{
-				m_graphics->setColour( c);
-				m_graphics->bar( x1, (int)y1, x2, (int)zero, 0);
-				int d=m_graphics->brighter( c, -15);
-				m_graphics->setColour( d);
-				m_graphics->rectangle( x1, (int)y1, x2, (int)zero, 0);
+				yBottom-=heightNow;
 			}
 		}
 	}
+	char s[32];
+	sprintf(s, "%d", (int)m_value[0]);
+	CgraphButton w( m_pParent, Crect( rect.left(), rect.top(), rect.width(), rect.height()-m_textHeight), s, false);
+	if (m_font.length())
+	{
+		w.setFont(CtextFont(m_font.c_str()));
+	}
+	w.m_noBackground =true;
+	w.onPaint( touch);
  }
 
 void CbarGraph::rotate()
@@ -255,6 +248,16 @@ void CbarGraph::setRange( double minimum, double maximum)
 void CbarGraph::setColourHelpLines( colour n)
 {
 	m_helpLines =n;
+}
+
+void CbarGraph::setTextHeight(int n)
+{
+	m_textHeight =n;
+}
+
+void CbarGraph::setFont(const std::string &font)
+{
+	m_font =font;
 }
 
 void CbarGraph::setColours( int n, colour background)

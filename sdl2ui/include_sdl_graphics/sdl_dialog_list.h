@@ -40,8 +40,11 @@
 /*------------- Standard includes --------------------------------------------*/
 #include <string>
 #include <vector>
-#include "my_thread.h"
-#include "sdl_types.h"
+#include <memory>
+#include <SDL_keysym.h>
+#include "my_thread.hpp"
+#include "sdl_keybutton.h"
+#include "sdl_dialog_event.h"
 
 /** @brief Basic interface for dialog. */
 class CdialogBase
@@ -54,7 +57,7 @@ public:
 	virtual std::string getName()=0;
 };
 
-typedef std::vector<CdialogBase*>::iterator dialogBaseIterator;
+typedef std::shared_ptr<CdialogBase> CdialogBasePtr;
 
 /** @brief List of dialogs available.
  */
@@ -65,23 +68,30 @@ public:
 	virtual ~CdialogList();
 
 public:
-	void addDialog( CdialogBase		*interface);
-	void removeDialog( CdialogBase	*interface);
-	CdialogBase *firstDialog();
-	CdialogBase *lastDialog();
-	CdialogBase *nextDialog( CdialogBase *current);
-	CdialogBase *previousDialog( CdialogBase *current);
-	Estatus onButton(keymode mod, keybutton sym);
+	void addDialog( CdialogBase	     *interface);
+    void addDialog( CdialogBasePtr    interface);
+    void removeDialog( CdialogBase   *interface);
+	void removeDialog( CdialogBasePtr interface);
+	void deleteDialogs();
 	void clear();
-	bool onPaint(); ///< Paint all buttons to the graphic layer
-	dialogBaseIterator begin();
-	dialogBaseIterator end();
-	int size() { return (int)m_dialogs.size(); }
-	void onRender(); ///< Move from graphic layer to the root
+    void resetPaintedArea();
+    Cdialog *findDialog( const Cpoint &point);
+    bool onInit();
+    bool onLoop();
+    bool onLoopWithSelfDestruct();
+    void onCleanup();
+    void onPaint();
+    void onClearScreen();
+    void invalidateSwypeDialogs();
+    void clearScreenAndPaint();
+    Estatus onButton(SDLMod mod, keybutton sym, Cdialog *parent, Estatus stat);
 
 private:
-	std::vector<CdialogBase*> m_dialogs;///< All dialogs available.
-	CdialogBase *m_interface; ///< Interface dialog.
+    Cdialog *findDialogInternal( const Cpoint &point);
+    CdialogBase *firstDialog();
+    CdialogBase *lastDialog();
+	std::vector<CdialogBase*> m_dialogs1;///< All dialogs available.
+    std::vector<CdialogBasePtr> m_dialogs2;///< All dialogs available.
 };
 
 /* END  SDL_DIALOG_LIST_H_ */

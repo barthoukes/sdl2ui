@@ -46,6 +46,7 @@ CkeyFile::CkeyFile()
 : m_file(NULL)
 , m_mouseDown(false)
 {
+    m_path = Cgraphics::m_defaults.data_path + ZHONGCAN_KEYFILE;
 }
 
 CkeyFile::~CkeyFile()
@@ -71,9 +72,7 @@ void CkeyFile::init()
 	}
 	close();
 	bool append =(enable==2);
-	std::string s=Cgraphics::m_defaults.data_path + ZHONGCAN_KEYFILE;
-	m_file =fopen( s.c_str(), append ? "at" : "wt");
-
+	m_file =fopen( m_path.c_str(), append ? "at" : "wt");
 }
 
 /// @brief Add button to file.
@@ -141,15 +140,12 @@ void CkeyFile::onEvent(const SDL_Event *event)
 			addEvent( "BUTTON_DOWN", event->button.x, event->button.y, "");
 			m_mouseDown =true;
 			break;
-#ifdef USE_SDL2
-#else
 		case SDL_BUTTON_WHEELUP:
 			addEvent( "WHEELUP", event->button.x, event->button.y, "");
 			break;
 		case SDL_BUTTON_WHEELDOWN:
 			addEvent( "WHEELDOWN", event->button.x, event->button.y, "");
 			break;
-#endif
 		default:
 			break;
 		}
@@ -185,6 +181,7 @@ void CkeyFile::onEvent(const Cevent &event)
 		addEvent( "KEYUP", event.mod, event.button, str);
 		break;
 
+	case EVENT_TOUCH_MOVE:
 	case EVENT_MOUSE_MOVE:
 		if ( m_mouseDown)
 		{
@@ -203,6 +200,7 @@ void CkeyFile::onEvent(const Cevent &event)
 
 	case EVENT_TOUCH_PRESS:
 		addEvent( "BUTTON_DOWN", event.point.x, event.point.y, "");
+		m_mouseDown =true;
 		break;
 
 	case EVENT_WHEEL_UP:
@@ -211,6 +209,10 @@ void CkeyFile::onEvent(const Cevent &event)
 
 	case EVENT_WHEEL_DOWN:
 		addEvent( "WHEELDOWN", event.point.x, event.point.y, "");
+		break;
+
+	case EVENT_BARCODE:
+		addEvent( "BARCODE", 0,0, event.barcode);
 		break;
 
 	default:

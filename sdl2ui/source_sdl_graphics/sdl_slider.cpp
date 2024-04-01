@@ -39,6 +39,7 @@
 #include "sdl_button.h"
 #include "sdl_slider.h"
 #include "sdl_image.h"
+#include "sdl_graphics.h"
 
 #define TOUCH_SLIDER
 
@@ -46,13 +47,13 @@
 ///
 /// @brief Constructor.
 //
-/// @param x [in] Position.
-/// @param y [in] Position.
-/// @param width [in] Position.
-/// @param height [in] Position.
+/// @param rect [in] Rectangle of slider
+/// @param unitSize [in] Should be smaller than max-minimum, step size of slider
+/// @param code [in] What code on display
+/// @param type [in] Different types of slider
 ///
 /*============================================================================*/
-Cslider::Cslider( const Crect &rect, int unitSize, keybutton code, EsliderType type)
+Cslider::Cslider( const Crect &rect, double unitSize, keybutton code, EsliderType type)
 : CdialogObject( NULL, rect, code)
 , m_sliderType( type)
 , m_scrollbarColour( Cgraphics::m_defaults.button_text)
@@ -69,6 +70,7 @@ Cslider::Cslider( const Crect &rect, int unitSize, keybutton code, EsliderType t
 , m_offDisabled( false)
 , m_itemsOnScreen( m_rect.height()/m_unitSize)
 {
+	m_dragEnable =true;
 }
 
 /*============================================================================*/
@@ -121,6 +123,11 @@ void Cslider::onPaint( int touch)
 	// offset_arrow=(height-2*height_arrow)*(y/(maximum-minimum))
 }
 
+void Cslider::onPaint( const Cpoint &p, int touch)
+{
+	(void)p; onPaint(touch);
+}
+
 #if 0
 void Cslider::paintVerticalUpDown()
 {
@@ -155,19 +162,19 @@ void Cslider::paintHorizontal()
 		offset_arrow =maxWidth*8*(m_value-m_minimum) /(m_maximum-m_minimum-m_itemsOnScreen);
 	}
 	m_image_x=(int)offset_arrow+m_rect.left()*8;
-	m_graphics->setColour( Cgraphics::m_defaults.slider_background);
-	m_graphics->rectangle( m_rect.left()*8, m_rect.top()*8, m_rect.right()*8, m_rect.bottom()*8, 4,3);
-	m_graphics->setColour( Cgraphics::m_defaults.slider_lines);
+	m_pGraphics->setColour( Cgraphics::m_defaults.slider_background);
+	m_pGraphics->rectangle( m_rect.left()*8, m_rect.top()*8, m_rect.right()*8, m_rect.bottom()*8, 4,3);
+	m_pGraphics->setColour( Cgraphics::m_defaults.slider_lines);
 	int y=(m_rect.top()+m_rect.bottom())*8/2;
 	int x1=m_rect.left()*8+24;
 	int x2=m_rect.right()*8-24;
-	m_graphics->line( x1,y, x2,y);
-	m_graphics->line( x1,y-10, x1,y+10);
-	m_graphics->line( (x1+x2)/2,y-5, (x1+x2)/2,y+5);
-	m_graphics->line( x2,y-10, x2,y+10);
+	m_pGraphics->line( x1,y, x2,y);
+	m_pGraphics->line( x1,y-10, x1,y+10);
+	m_pGraphics->line( (x1+x2)/2,y-5, (x1+x2)/2,y+5);
+	m_pGraphics->line( x2,y-10, x2,y+10);
 
 	int left =m_rect.left()*8+(int)m_rect.width()*8/2-24;
-	m_graphics->image( Cgraphics::m_defaults.icon_slider48, left, m_image_y, left+47, m_image_y+47);
+	m_pGraphics->image( Cgraphics::m_defaults.icon_slider48, left, m_image_y, left+47, m_image_y+47);
 }
 
 /// @brief Paint a vertical slider.
@@ -182,21 +189,18 @@ void Cslider::paintHorizontalBar()
 		offset_arrow =maxWidth*8*(m_value-m_minimum) /(m_maximum-m_minimum);
 	}
 	m_image_x=(int)offset_arrow+m_rect.left()*8;
-	m_graphics->setColour( Cgraphics::m_defaults.slider_background);
-	m_graphics->rectangle( m_rect.left()*8, m_rect.top()*8, m_rect.right()*8, m_rect.bottom()*8, 4,3);
+	m_pGraphics->setColour( Cgraphics::m_defaults.slider_background);
+	m_pGraphics->rectangle( m_rect.left()*8, m_rect.top()*8, m_rect.right()*8, m_rect.bottom()*8, 4,3);
 	int y=(m_rect.top()+m_rect.bottom())*8/2;
 	int x1=m_rect.left()*8+4;
 	int x2=m_rect.right()*8-4;
-	m_graphics->setColour( Cgraphics::m_defaults.line_bright);
-	m_graphics->bar( x1,y-5,m_image_x,y+4,0);
-	m_graphics->setColour( Cgraphics::m_defaults.slider_lines);
-	m_graphics->line( x1,y, x2,y);
-	m_graphics->line( x1,y-10, x1,y+10);
-	m_graphics->line( (x1+x2)/2,y-5, (x1+x2)/2,y+5);
-	m_graphics->line( x2,y-10, x2,y+10);
-
-	//int left =m_rect.left()*8+(int)m_rect.width()*8/2-24;
-	//m_graphics->image( Cgraphics::m_defaults.icon_slider48, left, m_image_y, left+47, m_image_y+47);
+	m_pGraphics->setColour( Cgraphics::m_defaults.line_bright);
+	m_pGraphics->bar( x1,y-5,m_image_x,y+4,0);
+	m_pGraphics->setColour( Cgraphics::m_defaults.slider_lines);
+	m_pGraphics->line( x1,y, x2,y);
+	m_pGraphics->line( x1,y-10, x1,y+10);
+	m_pGraphics->line( (x1+x2)/2,y-5, (x1+x2)/2,y+5);
+	m_pGraphics->line( x2,y-10, x2,y+10);
 }
 
 /// @brief Paint a vertical slider.
@@ -211,19 +215,19 @@ void Cslider::paintVertical()
 		offset_arrow =maxHeight*8*(m_value-m_minimum) /(m_maximum-m_minimum-m_itemsOnScreen);
 	}
 	m_image_y=(int)offset_arrow+m_rect.top()*8;
-	m_graphics->setColour( Cgraphics::m_defaults.slider_background);
-	m_graphics->rectangle( m_rect.left()*8, m_rect.top()*8, m_rect.right()*8, m_rect.bottom()*8, m_rect.width()*4,m_rect.width()*3);
-	m_graphics->setColour( Cgraphics::m_defaults.slider_lines);
+	m_pGraphics->setColour( Cgraphics::m_defaults.slider_background);
+	m_pGraphics->rectangle( m_rect.left()*8, m_rect.top()*8, m_rect.right()*8, m_rect.bottom()*8, m_rect.width()*4,m_rect.width()*3);
+	m_pGraphics->setColour( Cgraphics::m_defaults.slider_lines);
 	int x=(m_rect.left()+m_rect.right())*8/2;
 	int y1=m_rect.top()*8+24;
 	int y2=m_rect.bottom()*8-24;
-	m_graphics->line( x,y1, x,y2);
-	m_graphics->line( x-10,y1, x+10,y1);
-	m_graphics->line( x-5,(y1+y2)/2, x+5, (y1+y2)/2);
-	m_graphics->line( x-10,y2, x+10,y2);
+	m_pGraphics->line( x,y1, x,y2);
+	m_pGraphics->line( x-10,y1, x+10,y1);
+	m_pGraphics->line( x-5,(y1+y2)/2, x+5, (y1+y2)/2);
+	m_pGraphics->line( x-10,y2, x+10,y2);
 
 	int left =m_rect.left()*8+(int)m_rect.width()*8/2-24;
-	m_graphics->image( Cgraphics::m_defaults.icon_slider48, left, m_image_y, left+47, m_image_y+47);
+	m_pGraphics->image( Cgraphics::m_defaults.icon_slider48, left, m_image_y, left+47, m_image_y+47);
 }
 
 
@@ -344,9 +348,9 @@ bool Cslider::onDragStart( Cpoint p)
 /*============================================================================*/
 bool Cslider::onDragEnd( Cpoint p)
 {
-	onDrag( p);
+	bool retVal =onDrag( p);
 	m_offDisabled =false;
-	return true;
+	return retVal;
 }
 
 /*============================================================================*/
@@ -376,10 +380,11 @@ bool Cslider::onDrag( Cpoint p)
 		}
 		if ( value<m_minimum)
 		{
-			value =m_minimum;
+			value=m_minimum;
 		}
-		if ( m_value !=value)
+		if ( value !=m_value)
 		{
+			//Cgraphics::m_defaults.log( "Slider =%f", value);
 			m_value =value;
 			return true;
 		}
@@ -387,11 +392,30 @@ bool Cslider::onDrag( Cpoint p)
 	return false;
 }
 
+void Cslider::setValue( double y)
+{
+	m_value =gLimit( y, m_minimum, m_maximum-m_itemsOnScreen);
+}
+
+double Cslider::getValue()
+{
+	return m_value;
+}
+
+int Cslider::getInt()
+{
+	return (int)(m_value+0.5);
+}
+
 bool Cslider::setRange( double minimum, double maximum)
 {
 	bool retVal =false;
 	m_minimum =minimum;
 	m_maximum =maximum;
+	if ( maximum<minimum)
+	{
+		maximum = minimum;
+	}
 	if ( m_value<m_minimum)
 	{
 		m_value =m_minimum;
