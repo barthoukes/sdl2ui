@@ -1,18 +1,20 @@
 /** @cond EXTERNAL */
 
+#include "json_value.hpp"
+
 #include <iostream>
-#include <json_value.h>
-#include <json_writer.h>
 #include <utility>
 #include <stdexcept>
 #include <cstring>
 #include <cassert>
+
+#include "../include_json/json_writer.hpp"
 #ifdef JSON_USE_CPPTL
 # include <cpptl/conststring.h>
 #endif
 #include <cstddef>    // size_t
 #ifndef JSON_USE_SIMPLE_INTERNAL_ALLOCATOR
-# include "json_batchallocator.h"
+# include "../include_json/json_batchallocator.hpp"
 #endif // #ifndef JSON_USE_SIMPLE_INTERNAL_ALLOCATOR
 
 #define JSON_ASSERT_UNREACHABLE assert( false )
@@ -121,11 +123,11 @@ static struct DummyValueAllocatorInitializer {
 // //////////////////////////////////////////////////////////////////
 // //////////////////////////////////////////////////////////////////
 #ifdef JSON_VALUE_USE_INTERNAL_MAP
-# include "json_internalarray.inl"
-# include "json_internalmap.inl"
+# include "../include_json/json_internalarray.inl"
+# include "../include_json/json_internalmap.inl"
 #endif // JSON_VALUE_USE_INTERNAL_MAP
 
-# include "json_valueiterator.inl"
+# include "../include_json/json_valueiterator.inl"
 
 
 // //////////////////////////////////////////////////////////////////
@@ -1376,6 +1378,12 @@ Value::toStyledString() const
    return writer.write( *this );
 }
 
+std::string
+Value::toFastString() const
+{
+   FastWriter writer;
+   return writer.write( *this );
+}
 
 Value::const_iterator 
 Value::begin() const

@@ -1,6 +1,5 @@
 /** @cond EXTERNAL */
 
-#include <json_writer.h>
 #include <utility>
 #include <assert.h>
 #include <stdio.h>
@@ -8,6 +7,7 @@
 #include <iostream>
 #include <sstream>
 #include <iomanip>
+#include "json_writer.hpp"
 
 #if _MSC_VER >= 1400 // VC++ 8.0
 #pragma warning( disable : 4996 )   // disable warning about strdup being deprecated.

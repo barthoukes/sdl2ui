@@ -1,13 +1,15 @@
 /** @cond EXTERNAL */
 
-#include <json_reader.h>
-#include <json_value.h>
+#include "json_reader.hpp"
+
 #include <utility>
 #include <cstdio>
 #include <cassert>
 #include <cstring>
 #include <iostream>
 #include <stdexcept>
+
+#include "json_value.hpp"
 
 #if _MSC_VER >= 1400 // VC++ 8.0
 #pragma warning( disable : 4996 )   // disable warning about strdup being deprecated.
