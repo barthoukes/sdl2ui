@@ -46,6 +46,7 @@ static unsigned int crc32[] =
 	0xb40bbe37, 0xc30c8ea1, 0x5a05df1b, 0x2d02ef8d
 };
 
+#include <stdio.h>
 unsigned int calculateCRC32( unsigned int crc, const void *buf, unsigned int size)
 {
 	const unsigned char *p;
@@ -55,8 +56,10 @@ unsigned int calculateCRC32( unsigned int crc, const void *buf, unsigned int siz
 
 	while (size>0)
 	{
-		crc = crc32[(crc ^ *p++) & 0xFF] ^ (crc >> 8);
+		crc = crc32[(crc ^ *p) & 0xFF] ^ (crc >> 8);
+		//printf("data = %0d, crc=%08x\n", *p, crc);
 		size--;
+		p++;
 	}
 	return crc ^ ~0U;
 }

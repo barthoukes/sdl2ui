@@ -5,7 +5,7 @@
  *      Author: mensfort
  */
 
-#include "tar.h"
+#include "tar.hpp"
 #include "stdio.h"
 #include "stdlib.h"
 

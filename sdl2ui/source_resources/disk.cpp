@@ -1,4 +1,4 @@
-/*============================================================================*/
+ /*============================================================================*/
 /**  @file		disk.cpp
  *   @ingroup   zhongcan
  *   @brief     Disk functions.
@@ -11,10 +11,37 @@
 #include <dirent.h>
 #include <stdio.h>
 #include <unistd.h>
-#include "disk.h"
+#include "disk.hpp"
+
+/*function to get disk files*/
+bool Cdisk::getDir(const std::string &dir, fileList &files)
+{
+	DIR *dp;
+	struct dirent *dirp;
+	if ((dp = opendir(dir.c_str())) == NULL)
+	{
+		return false;
+	}
+
+	while ((dirp = readdir(dp)) != NULL)
+	{
+		if (dirp->d_name[0]!='.' && dirp->d_type!=DT_DIR)
+		{
+		    files.push_back(std::string(dirp->d_name));
+		}
+	}
+	closedir( dp);
+	return true;
+}
+
+bool Cdisk::getDir(const std::string &dir, const std::string &find, fileList &files)
+{
+    std::vector<std::string> a;
+    return getDevDir(dir, find, files, a);
+}
 
 /*function... might want it in some class?*/
-bool Cdisk::getdir(std::string dir, std::vector<std::string> &files)
+bool Cdisk::getDirectories(const std::string &dir, fileList &files)
 {
 	DIR *dp;
 	struct dirent *dirp;
@@ -26,7 +53,11 @@ bool Cdisk::getdir(std::string dir, std::vector<std::string> &files)
 
 	while ((dirp = readdir(dp)) != NULL)
 	{
-		files.push_back(std::string(dirp->d_name));
+		if (dirp->d_name[0]!='.' &&
+		    (dirp->d_type==DT_DIR || dirp->d_type==DT_LNK))
+		{
+		    files.push_back(std::string(dirp->d_name));
+		}
 	}
 	closedir( dp);
 	return true;
@@ -37,7 +68,8 @@ bool Cdisk::getdir(std::string dir, std::vector<std::string> &files)
  * @param find [in] What to search for
  * @param files [out] What files found
  * */
-bool Cdisk::getdir(std::string dir, const std::string &find, std::vector<std::string> &files)
+bool Cdisk::getDevDir(std::string dir, const std::string &find, std::vector<std::string> &files,
+		 const std::vector<std::string> &excludeFiles)
 {
 	DIR *dp;
 	struct dirent *dirp;
@@ -52,7 +84,18 @@ bool Cdisk::getdir(std::string dir, const std::string &find, std::vector<std::st
 		std::string found =dirp->d_name;
 		if ( found.find(find) !=std::string::npos)
 		{
-			files.push_back(std::string(dirp->d_name));
+			bool valid = true;
+			for ( const std::string &x : excludeFiles)
+			{
+				if (found.find(x) !=std::string::npos)
+				{
+					valid =false;
+				}
+			}
+			if (valid)
+			{
+				files.push_back(std::string(dirp->d_name));
+			}
 		}
 	}
 	closedir( dp);
@@ -152,11 +195,12 @@ int Cdisk::fileSize( const std::string &name)
 #define SKIPSPACE(x) while(*(x)!=' ' and *(x)) (x)++; while (*(x)==' ' && *(x)) (x)++;
 #define SKIPLINE(x) while(*(x)>=' ' and *(x)) (x)++; while (*(x)<' ' && *(x)) (x)++;
 
-void Cdisk::getDir( const char *files, fileDetailList &list)
+void Cdisk::getDetailedDir(const std::string &fileList, fileDetailList &list)
 {
 	int mfiles=0;
 	int mlines=0;
 	list.clear();
+	const char *files = fileList.c_str();
 	while ( *files)
 	{
 		if (!*files)
@@ -190,4 +234,35 @@ void Cdisk::getDir( const char *files, fileDetailList &list)
 		SKIPLINE(files);
 	}
 	printf("Lines=%d, files=%d\n", mlines,mfiles);
+}
+
+std::string Cdisk::getFileData( const std::string fileName)
+{
+    std::string retVal;
+    try
+    {
+        FILE *F=fopen(fileName.c_str(), "rb");
+        if (!F)
+        {
+            return 0;
+        }
+        // set the file pointer to end of file
+        char data[4096];
+        int n= fread(data, 1,4092, F);
+        fclose( F );
+        if (n>0)
+        {
+            data[n--] = 0;
+        }
+        while(n>0 && data[n]<32)
+        {
+            data[n--]=0;
+        }
+        retVal = data;
+    }
+    catch (...)
+    {
+    }
+    return retVal;
+
 }

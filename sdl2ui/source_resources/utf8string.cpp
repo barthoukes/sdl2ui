@@ -1,5 +1,5 @@
 /*============================================================================*/
-/**  @file      zhongstring.cpp
+/**  @file      utf8string.cpp
  **  @ingroup   drivers
  **  @brief		Handle chinese string and convert between:
  **             1. gb format. (memory)
@@ -23,59 +23,27 @@
 
 /*------------- Standard includes --------------------------------------------*/
 #include <sstream>
+#include <string.h>
 #include <assert.h>
-#include "utf8string.h"
-//#include "zhongcan_defines.h"
+#include "utf8string.hpp"
 
-#if 0
-/*============================================================================*/
-///
-/// @brief 		Constructor.
-///
-/// @param		s [in] String to convert.
-///
-/*============================================================================*/
-zhongstring::zhongstring(const std::string & s)
-{
-	*this=s;
-}
-
-/*============================================================================*/
-///
-/// @brief 		Constructor.
-///
-/// @param		s [in] String to convert.
-///
-/*============================================================================*/
-zhongstring::zhongstring(const char *s)
-{
-	*this=s;
-}
-
-/*============================================================================*/
-///
-/// @brief 		Destructor.
-///
-/*============================================================================*/
-zhongstring::~zhongstring()
-{
-	m_numbers.clear();
-}
-#endif
-
+/*----------------------------------------------------------------------------*/
 utf8string::utf8string(const std::string & s)
 : m_string(s)
 {
 }
 
+/*----------------------------------------------------------------------------*/
 utf8string::utf8string(const char *s)
 : m_string(s)
 {
 }
 
+/*----------------------------------------------------------------------------*/
 utf8string::~utf8string()
 {}
 
+/*----------------------------------------------------------------------------*/
 void utf8string::set( size_t index, int nr)
 {
 	// Offset at cursor.
@@ -131,7 +99,8 @@ void utf8string::set( size_t index, int nr)
 	}
 }
 
-std::string utf8string::sub( size_t left, size_t right)
+/*----------------------------------------------------------------------------*/
+std::string utf8string::subStr( size_t left, size_t right)
 {
 	left =getOffset( left);
 	if ( ((int)right)<=0)
@@ -152,6 +121,7 @@ std::string utf8string::sub( size_t left, size_t right)
 	return u;
 }
 
+/*----------------------------------------------------------------------------*/
 int utf8string::characterLength( const char *value)
 {
 	int first;
@@ -194,6 +164,7 @@ int utf8string::characterLength( const char *value)
 	return 1;
 }
 
+/*----------------------------------------------------------------------------*/
 int utf8string::utf8character( const char *value)
 {
 	int first;
@@ -241,17 +212,20 @@ int utf8string::utf8character( const char *value)
 	return 0;
 }
 
+/*----------------------------------------------------------------------------*/
 int utf8string::operator[](size_t index) const
 {
 	return utf8character(index);
 }
 
+/*----------------------------------------------------------------------------*/
 int utf8string::utf8character( size_t index) const
 {
 	index =getOffset( index);
 	return utf8character( m_string.c_str()+index);
 }
 
+/*----------------------------------------------------------------------------*/
 size_t utf8string::size() const
 {
 	const char *s =m_string.c_str();
@@ -268,6 +242,19 @@ size_t utf8string::size() const
 	return a;
 }
 
+/*----------------------------------------------------------------------------*/
+int utf8string::length() const
+{
+    return (int)size();
+}
+
+/*----------------------------------------------------------------------------*/
+void utf8string::replace(const std::string &find_what, const std::string &replace_with)
+{
+    ::replace(m_string, find_what, replace_with);
+}
+
+/*----------------------------------------------------------------------------*/
 int utf8string::getOffset( size_t cursor) const
 {
 	const char *s=m_string.c_str();
@@ -283,6 +270,7 @@ int utf8string::getOffset( size_t cursor) const
 	return offset;
 }
 
+/*----------------------------------------------------------------------------*/
 void utf8string::erase( size_t cursor)
 {
 	// Offset at cursor.
@@ -294,6 +282,7 @@ void utf8string::erase( size_t cursor)
 	}
 }
 
+/*----------------------------------------------------------------------------*/
 void utf8string::insert( size_t cursor, const utf8string &str)
 {
 	int pos =getOffset(cursor);
@@ -302,11 +291,11 @@ void utf8string::insert( size_t cursor, const utf8string &str)
 
 }
 
+/*----------------------------------------------------------------------------*/
 void utf8string::insert( size_t cursor, int nr)
 {
 	char s[4];
 	s[0]=0;
-	//int len =(number>=0x80)? ((number>=0x100)?3:2):(1);
 	int pos =getOffset( cursor);
 
 	if (nr<0x80)
@@ -329,6 +318,7 @@ void utf8string::insert( size_t cursor, int nr)
 	}	m_string.insert( pos, s);
 }
 
+/*----------------------------------------------------------------------------*/
 /** @brief Remove last character. */
 void utf8string::pop_back()
 {
@@ -344,6 +334,7 @@ void utf8string::pop_back()
 	}
 }
 
+/*----------------------------------------------------------------------------*/
 /** @brief Add character at the end.
  *  @param nr [in] What utf-8 character.
  */
@@ -366,7 +357,7 @@ void utf8string::push_back( int nr)
 	}
 }
 
-
+/*----------------------------------------------------------------------------*/
 /// @brief Compare strings.
 int memicmp( const void *a, const void *b, size_t len)
 {
@@ -383,6 +374,7 @@ int memicmp( const void *a, const void *b, size_t len)
 	return 0;
 }
 
+/*----------------------------------------------------------------------------*/
 bool utf8string::startWith( int cursor, const std::string &compare)
 {
 	int pos =getOffset( cursor);
@@ -393,18 +385,72 @@ bool utf8string::startWith( int cursor, const std::string &compare)
 	return false;
 }
 
+/*----------------------------------------------------------------------------*/
+void utf8string::trimTags()
+{
+    for (;;)
+    {
+        int c = m_string.find("<");
+        if (c>=0)
+        {
+            int d= m_string.find(">", c+1);
+            if (d>c)
+            {
+                m_string.erase(c, d-c+1);
+                continue;
+            }
+        }
+        break;
+    }
+}
+
+/*----------------------------------------------------------------------------*/
+void utf8string::trim()
+{
+    m_string.erase(0, m_string.find_first_not_of(' '));       //prefixing spaces
+    m_string.erase(m_string.find_last_not_of(' ')+1);         //surfixing spaces
+}
+
+/*----------------------------------------------------------------------------*/
+void utf8string::trimRoundBrackets()
+{
+    for (;;)
+    {
+        int c = m_string.find(")");
+        if (c>=0)
+        {
+            int d= m_string.rfind(")", c-1);
+            if (d>c)
+            {
+                m_string.erase(c, d-c+1);
+                continue;
+            }
+        }
+        break;
+    }
+}
+
+/*----------------------------------------------------------------------------*/
 void utf8string::push_back( const std::string &s)
 {
 	m_string +=s;
 }
 
+/*----------------------------------------------------------------------------*/
+void utf8string::push_front( const std::string &s)
+{
+    m_string =s+m_string;
+}
+
+#define LAST_ASCII_CHAR 255
+/*----------------------------------------------------------------------------*/
 void utf8string::onlyAscii()
 {
 	for ( size_t a=0; a<size(); a++)
 	{
 		int index =getOffset( a);
 		unsigned short val =utf8character( m_string.c_str()+index);
-		if (val>255)
+		if (val>LAST_ASCII_CHAR)
 		{
 			// remove this character!!
 			erase(a);
@@ -413,6 +459,7 @@ void utf8string::onlyAscii()
 	}
 }
 
+/*----------------------------------------------------------------------------*/
 void utf8string::firstCharacterCapital()
 {
 	if ( m_string.size() ==0)
@@ -425,11 +472,13 @@ void utf8string::firstCharacterCapital()
 	}
 }
 
+/*----------------------------------------------------------------------------*/
 const char *utf8string::c_str() const
 {
 	return m_string.c_str();
 }
 
+/*----------------------------------------------------------------------------*/
 void utf8string::toUpper()
 {
 	const char *s =m_string.c_str();
@@ -451,7 +500,7 @@ void utf8string::toUpper()
 	}
 }
 
-
+/*----------------------------------------------------------------------------*/
 void utf8string::toLower()
 {
 	const char *s =m_string.c_str();
@@ -473,6 +522,7 @@ void utf8string::toLower()
 	}
 }
 
+/*----------------------------------------------------------------------------*/
 void utf8string::sort()
 {
 	int sz=size();
@@ -511,6 +561,7 @@ void utf8string::sort()
 	}
 }
 
+
 /*============================================================================*/
 ///
 /// @brief 		Replace text in string.
@@ -540,7 +591,7 @@ void replace( std::string &str, const std::string &find_what, const std::string 
 /// @return		Writable sql string.
 ///
 /*============================================================================*/
-std::string tosql( std::string str)
+std::string toSql( const std::string &str)
 {
 	std::string tmp=str;
 	replace(tmp, "'", "''");
@@ -552,12 +603,11 @@ std::string tosql( std::string str)
 bool strfind( const char *s1, const char *s2)
 // if s2 is element in s1 return OK
 {
-	int g;
 	if (!*s2)
 		return true;
 	while (*s1)
 	{
-		g = 0;
+		int g = 0;
 		while (tolower(s2[g]) == tolower(s1[g]))
 		{
 			g++;
@@ -567,4 +617,60 @@ bool strfind( const char *s1, const char *s2)
 		s1++;
 	}
 	return false;
+}
+
+std::string utf8ToUtf8mb4String(const std::string &bufferIn)
+{
+    size_t n=bufferIn.length();
+    const unsigned char* buffer =(const unsigned char*) bufferIn.c_str();
+    static const unsigned char utf8_lengths[] = {
+        0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0,
+        0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0,
+        0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0,
+        0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0,
+        0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0,
+        0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0,
+        0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0,
+        0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0,
+        0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0,
+        0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0,
+        0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0,
+        0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0,
+        1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1,
+        1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1,
+        2, 2, 2, 2, 2, 2, 2, 2, 2, 2, 2, 2, 2, 2, 2, 2,
+        3, 3, 3, 3, 3, 3, 3, 3, 4, 4, 4, 4, 5, 5, 0, 0,
+        0xFF, 0x1F, 0x0F, 0x07, 0x03, 0x01
+    };
+    static const unsigned char bom[] = { 0xEF, 0xBB, 0xBF };
+    static const unsigned char *masks = utf8_lengths + 0x100;
+    if (n >= 3 && !memcmp(buffer, bom, 3))
+    {
+        buffer += 3;
+        n -= 3;
+    }
+    //int cursor = 0;
+    //unsigned char output[4096];
+    std::string output;
+    //size_t writer = 0;
+    for (size_t i = 0; i != n;)
+    {
+        unsigned char byte = buffer[i++];
+        unsigned char length = utf8_lengths[byte];
+        if (length > n - i)
+        {
+            break;
+        }
+        unsigned char wc = byte & masks[length];
+        for (;length; length--)
+        {
+            wc <<= 6;
+            wc |= (buffer[i++] & 0x3F);
+        }
+        output +=wc;
+        //output[cursor++] = wc;
+        //output[cursor] =0;
+    }
+    //dst.assign(temp_pointer, temp_pointer + writer);
+    return output;
 }

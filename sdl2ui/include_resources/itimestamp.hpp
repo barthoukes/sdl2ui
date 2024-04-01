@@ -1,7 +1,7 @@
 /*
- * text_splitter.h
+ * itimestamp.hpp
  *
- *  Created on: 14 apr. 2012
+ *  Created on: 30 aug 2020
  *      Author: mensfort
  */
 /*------------------------------------------------------------------------------
@@ -31,28 +31,25 @@
 
 #pragma once
 
-/*------------- Standard includes --------------------------------------------*/
-#include <vector>
+#include <memory>
 #include <string>
-#include "utf8string.h"
 
-/// @brief  Split a string into nice pieces to handle.
-class CtextSplitter
+/// @brief Timestamp to add in classes.
+class Itimestamp
 {
 public:
-	CtextSplitter( const std::string &string, const std::string &sign1, const std::string &sign2);
-	~CtextSplitter() {}
-	int size() { return m_size; }
-	utf8string operator[]( int index) { return m_array[index]; }
-	void first_character_capital();
-	void all_capitals();
-	void all_lower_case();
-	void push_back( const utf8string &str) { m_array.push_back(str); m_size++; }
-	void insert( int y, const utf8string &str);
+	Itimestamp() {}
+	virtual ~Itimestamp() {}
 
-private:
-	std::vector<utf8string> m_array;
-	int m_size;
+	virtual int getYear() const =0;
+	virtual int getHours() const =0;
+	virtual int getMinutes() const =0;
+	virtual int getSeconds() const =0;
+	virtual int getDay() const =0;
+	virtual int getMonth() const =0;
+	virtual int getQuarter() const =0;
+	virtual int getMilliseconds() const =0;
+	virtual int getWeek() =0;
 };
 
-/* TEXT_SPLITTER_H_ */
+typedef std::shared_ptr<Itimestamp> ItimestampPtr;

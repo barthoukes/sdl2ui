@@ -5,48 +5,49 @@
  *      Author: mensfort
  */
 
-#include <pthread.h>
-#include "my_thread.h"
-#include "timeout.h"
+#include "my_thread.hpp"
+#include "timeout.hpp"
 
+#if __cplusplus <= 199711L
 /** @brief Interrupt handler.
  *  @param ptr [in] SELF pointer for the instance.
  */
 void *mythread_interrupt(void *ptr)
 {
-	CmyThread *irq =
-			static_cast<CmyThread*> (ptr);
+	CmyThread *irq = static_cast<CmyThread*> (ptr);
 	if (irq != NULL)
 	{
 		irq->run();
 	}
 	return NULL;
 }
+#endif
 
 /** Constructor */
 CmyLock::CmyLock()
 {
-    (void) pthread_mutexattr_init( &m_attr);
-	pthread_mutexattr_settype( &m_attr, PTHREAD_MUTEX_RECURSIVE);
-	pthread_mutex_init( &m_mutex, &m_attr);
 }
 
 /** Lock the thread for other threads. */
 void CmyLock::lock()
 {
-	pthread_mutex_lock( &m_mutex);
+	m_mutex.lock();
 }
 
 /** Unlock the thread for other threads. */
 void CmyLock::unlock()
 {
-	pthread_mutex_unlock( &m_mutex);
+	m_mutex.unlock();
 }
 
 /** Constructor new thread. */
 CmyThread::CmyThread()
-: m_running( false)
-, m_thread( 0)
+: CmyLock()
+, m_running( false)
+#if __cplusplus <= 199711L
+, m_pThread( nullptr)
+#else
+#endif
 , m_stopThread( false)
 {
 }
@@ -54,27 +55,61 @@ CmyThread::CmyThread()
 /** Start thread. */
 void CmyThread::start()
 {
-	m_running =true;
-	m_stopThread =false;
-	pthread_attr_t attr;
-	pthread_attr_init(&attr);
-	pthread_attr_setdetachstate(&attr, PTHREAD_CREATE_JOINABLE);
-	int stack_size =8192*1024;
-	pthread_attr_setstacksize(&attr, stack_size);
-	pthread_create(&m_thread, &attr, mythread_interrupt, (void*) this);
+	if (!m_running)
+	{
+    	m_running =true;
+        m_stopThread =false;
+#if __cplusplus <= 199711L
+        m_pThread = std::make_shared<std::thread>(mythread_interrupt, this);
+#else
+        m_pThread = std::make_shared<std::thread>([this]{ run(); });
+#endif
+	}
+}
+
+void CmyThread::startWorking()
+{
+}
+
+void CmyThread::stopWorking()
+{
+}
+
+bool CmyThread::isStopping()
+{
+	lock();
+	bool retVal = m_stopThread;
+	unlock();
+	return retVal;
+}
+
+bool CmyThread::isRunning()
+{
+	lock();
+	bool retVal = m_running && !m_stopThread;
+	unlock();
+	return retVal;
+}
+
+void CmyThread::stopFromThread()
+{
+	lock();
+	m_stopThread = true;
+	unlock();
 }
 
 /** Thread function running. */
 void CmyThread::run()
 {
 	startWorking();
-	while (m_running && m_stopThread==false)
+	while (isRunning())
 	{
 		work();
 	}
-	m_running =false;
 	stopWorking();
+#if __cplusplus <= 199711L
 	pthread_exit(0);
+#endif
 }
 
 /** Function to override for a thread. */
@@ -86,18 +121,28 @@ void CmyThread::work()
 /** Destructor. */
 CmyLock::~CmyLock()
 {
-	pthread_mutex_destroy(&m_mutex);
+}
+
+void CmyThread::forceStop()
+{
+	// User can override to force a stop.
 }
 
 /** Stop thread. */
 void CmyThread::stop()
 {
-	if (m_thread)
+	lock();
+	if (m_pThread.get() && m_running)
 	{
 		m_stopThread = true;
-		pthread_join( m_thread, NULL);
-		m_thread =(pthread_t)NULL;
+		unlock();
+		forceStop();
+	    m_pThread->join();
+	    lock();
+	    m_pThread = nullptr;
+	    m_running = false;
 	}
+    unlock();
 }
 
 /** Destructor. */

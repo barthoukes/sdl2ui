@@ -1,7 +1,7 @@
 /*
- * my_thread.h
+ * text_splitter.hpp
  *
- *  Created on: 5 jun. 2012
+ *  Created on: 14 apr. 2012
  *      Author: mensfort
  */
 /*------------------------------------------------------------------------------
@@ -32,43 +32,38 @@
 #pragma once
 
 /*------------- Standard includes --------------------------------------------*/
-#include "i386-linux-gnu/bits/pthreadtypes.h"
-#include "pthread.h"
+#include <vector>
+#include <string>
+#include "utf8string.hpp"
 
-
-// @brief Class to create a single lock.
-class CmyLock
+/// @brief  Split a string into nice pieces to handle.
+class CtextSplitter
 {
 public:
-	CmyLock();
-	virtual ~CmyLock();
-	void lock();
-	void unlock();
+	CtextSplitter( const std::string &string, const std::string &sign1, const std::string &sign2, bool trim);
+	~CtextSplitter() {}
+	int size() const;
+	utf8string operator[]( int index) const;
+	void first_character_capital();
+	void all_capitals();
+	void all_lower_case();
+	void push_back( const utf8string &str);
+	void insert( int y, const utf8string &str);
+    void trim_tags();
+    void remove_left(int nr_characters);
+    void trim_round_brackets();
+    void trim();
+    bool empty() const;
+    void erase(int index);
+    std::string join( int start, const std::string &join) const;
 
 private:
-	pthread_mutex_t		m_mutex;
-	pthread_mutexattr_t  m_attr; ///< Mutex attributes.
-};
-
-// @brief Class to create a single thread.
-class CmyThread : public CmyLock
-{
-public:
-	CmyThread();
-	virtual ~CmyThread();
-	virtual void startWorking() {}
-	virtual void stopWorking() {}
-	virtual void run();
-	virtual void work();
-	virtual void start();
-	virtual void stop();
-	bool isStopping() { return m_stopThread; }
-	bool isRunning() { return m_running && !m_stopThread; }
+	bool trim(std::string &word) const;
 
 private:
-	bool 				m_running; 		///< Thread is now running.
-	pthread_t  			m_thread;		///< Pointer to thread.
-	bool				m_stopThread; 	///< Indicate to stop thread.
+	std::vector<utf8string> m_array;
+	int m_size;
+	bool m_trim;
 };
 
-/* End MY_THREAD_H_ */
+/* TEXT_SPLITTER_H_ */

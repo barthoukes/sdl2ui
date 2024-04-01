@@ -10,11 +10,13 @@
 /*------------- Standard includes --------------------------------------------*/
 #include <sys/time.h>
 #include <assert.h>
+#include <unistd.h>
+
+#include "timeout.hpp"
 
 /*------------- Module options / compiler switches ---------------------------*/
 
 /*------------- Includes -----------------------------------------------------*/
-#include "timeout.h"
 #include "pthread.h"
 
 /*------------- Local symbolic constants -------------------------------------*/
@@ -141,7 +143,9 @@ bool Ctimeout::expired(void)
 		{
 			if ( ++m_tries >m_minRetries)
 			{
-				if ( m_margin >0 && m_lastElapsed >=m_timeout +m_margin && m_margin)
+				if (  m_margin >0
+				   && m_lastElapsed >=m_timeout +m_margin
+				   && m_minRetries)
 				{
 					m_startTime =GetTickCount();
 					m_tries =0;
@@ -220,20 +224,25 @@ int Ctimeout::running(void)
 }
 
 
-void delay(double time)
+/*----------------------------------------------------------------------------*/
+void delay(int millisec)
 {
-	if ( time<0.000001)
+#if 0
+	if ( millisec<0.000001)
 	{
 		return;
 	}
-	//pthread_mutex_lock( &g_mutex);
-	int uSec =static_cast<int>(time*1000.0f);
-    struct timeval tv;
-    tv.tv_usec =(__suseconds_t)uSec;
-    tv.tv_sec = (time_t)(uSec / 1000000);  // seconds.sh
-
-    select(0, NULL, NULL, NULL, &tv);
-	//pthread_mutex_unlock( &g_mutex);
+	if (millisec>=1000)
+	{
+	    sleep((int)(millisec/1000));
+	}
+	else
+	{
+	    usleep(millisec*1000L);
+	}
+#else
+	std::this_thread::sleep_for(std::chrono::milliseconds(millisec));
+#endif
 }
 
 /*======-----==================================================================
